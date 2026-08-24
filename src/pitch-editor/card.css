@@ -1,0 +1,171 @@
+.fx-card {
+  position: relative;
+  width: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: grab;
+  user-select: none;
+  border-radius: 8px;
+  padding: 5px 4px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+}
+
+.fx-card:hover:not(.fx-card--locked):not(.fx-card--empty) {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.fx-card--locked {
+  cursor: not-allowed;
+}
+
+/* Empty slots are only meaningful while a swap is in progress (native drag,
+   or a card armed via "Start Swap") -- removed from layout entirely
+   otherwise, so a partially-filled row centers around its real players
+   only and reads like an actual formation instead of a full-width grid. */
+.fx-card--empty {
+  display: none;
+  cursor: default;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  min-height: 78px;
+  justify-content: center;
+}
+
+.fx-card--empty.fx-card--empty-visible {
+  display: flex;
+}
+
+.fx-card--dragging {
+  opacity: 0.35;
+}
+
+.fx-card--armed {
+  border-color: #ffd166;
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.35);
+  background: rgba(255, 209, 102, 0.1);
+}
+
+/* A legal target, not currently under the cursor. */
+.fx-card--drag-target-valid {
+  box-shadow: 0 0 0 1px rgba(91, 224, 138, 0.35);
+}
+
+/* A legal target directly under the cursor during a native drag. */
+.fx-card--drop-target {
+  border-color: #5be08a;
+  box-shadow: 0 0 0 2px rgba(91, 224, 138, 0.4);
+  background: rgba(91, 224, 138, 0.12);
+}
+
+/* Not a legal target for the player currently being moved. */
+.fx-card--drag-invalid {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.fx-card__crest {
+  width: auto;
+  height: 46px;
+  max-width: 52px;
+  object-fit: contain;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+}
+
+.fx-card__pos {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 8px;
+  font-weight: 700;
+  color: #0e1116;
+  background: rgba(245, 247, 250, 0.9);
+  border-radius: 3px;
+  padding: 0 3px;
+  pointer-events: none;
+}
+
+.fx-card__name {
+  font-size: 10.5px;
+  color: #fff;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  margin-top: 1px;
+}
+
+/* Fantrax's own real-life "is this player playing" indicator, reused here.
+   See EVENT_STATUS_MAP in roster.js for what each color means. */
+.fx-card__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 3px;
+  margin-bottom: 1px;
+  pointer-events: auto;
+}
+
+.fx-card__dot--starting {
+  background: hsl(160 84% 38%);
+}
+
+.fx-card__dot--expected {
+  background: hsl(27 100% 61%);
+}
+
+.fx-card__dot--bench {
+  background: hsl(46 97% 65%);
+}
+
+.fx-card__dot--out {
+  background: hsl(349.7 80% 60.2%);
+}
+
+.fx-card__fpts {
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+  margin-top: 1px;
+}
+
+.fx-card__fpts--pos {
+  color: #ffd166;
+}
+
+.fx-card__fpts--neg {
+  color: #ff8a80;
+}
+
+.fx-card__fpts--zero {
+  color: #aeb8c4;
+}
+
+.fx-card__opp {
+  font-size: 8.5px;
+  color: #cfe0ea;
+  opacity: 0.75;
+  text-align: center;
+  line-height: 1.25;
+  max-width: 86px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  margin-top: 2px;
+}
+
+.fx-card__plus {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}

@@ -16,41 +16,8 @@
 (function () {
   'use strict';
 
-  // Abbreviation -> full name, scraped from Fantrax's own Classic-view
-  // header tooltips so it stays accurate to this league's stat set.
-  const ABBR_MAP = {
-    GS: 'Games Started',
-    Min: 'Minutes Played',
-    CS: 'Clean Sheets On Field',
-    GA: 'Goals Against',
-    Sv: 'Saves',
-    YC: 'Yellow Cards',
-    RC: 'Red Cards',
-    PKS: 'Penalty Kick Saves',
-    SBON: 'Substitutions On',
-    SBOF: 'Substitutions Off',
-    TkW: 'Tackles Won',
-    DIS: 'Dispossessed',
-    G: 'Goals',
-    KP: 'Key Passes (Assists on Shots)',
-    AT: 'Assists (Total)',
-    Int: 'Interceptions',
-    CLR: 'Effective Clearances',
-    CoS: 'Successful Dribbles (Contests Succeeded)',
-    AER: 'Aerials Won',
-    HCS: 'High Claims Succeeded',
-    Sm: 'Smothers',
-    OG: 'Own Goals',
-    SOT: 'Shots on Target',
-    SOP: 'Shots off the Post',
-    ACNC: 'Accurate Crosses (No Corners)',
-    BS: 'Blocked Shots',
-    BCC: 'Big Chances Created',
-    BCM: 'Big Chances Missed',
-    PKM: 'Penalty Kicks Missed',
-    PKD: 'Penalty Kicks Drawn',
-    GAO: 'Goals Against Outfielders',
-  };
+  // Abbreviation -> full name (shared with pitch-editor.js via stat-names.js).
+  const ABBR_MAP = window.FX_STAT_NAMES;
 
   const THROTTLE_MS = 30000; // don't re-snapshot raw stats more than every 30s
   const PIN_COOLDOWN_MS = 10 * 60 * 1000; // respect a manual "Stats" click for 10 min

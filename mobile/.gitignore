@@ -1,0 +1,34 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# iOS build outputs (keep ios/ source checked in)
+ios/App/Pods/
+ios/App/output/
+ios/App/build/
+ios/App/DerivedData/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/App/config.xml
+ios/App/Podfile.lock
+ios/capacitor-cordova-ios-plugins/
+
+# Android build outputs (keep android/ source checked in)
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/src/main/res/xml/config.xml
+android/capacitor-cordova-android-plugins/
+android/.idea/
+*.iml
+
+# Capacitor-generated web asset copies
+www/**
+!www/index.html
+
+# Misc
+.DS_Store

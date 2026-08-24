@@ -1,0 +1,9 @@
+{
+  "appId": "com.noahsemus.fantraxrefinements",
+  "appName": "Fantrax Refinements",
+  "webDir": "www",
+  "server": {
+    "url": "https://www.fantrax.com",
+    "allowNavigation": ["fantrax.com", "*.fantrax.com"]
+  }
+}

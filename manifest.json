@@ -11,14 +11,31 @@
   "content_scripts": [
     {
       "matches": ["https://www.fantrax.com/*"],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "js": ["src/shared/stat-names.js", "src/content/content.js"],
+      "css": ["src/content/content.css"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://www.fantrax.com/fantasy/league/*/team/roster*"],
-      "js": ["pitch-editor.js"],
-      "css": ["pitch-editor.css"],
+      "js": [
+        "src/shared/stat-names.js",
+        "src/pitch-editor/state.js",
+        "src/pitch-editor/roster.js",
+        "src/pitch-editor/tabs.js",
+        "src/pitch-editor/render.js",
+        "src/pitch-editor/drag.js",
+        "src/pitch-editor/tooltip.js",
+        "src/pitch-editor/points-sync.js",
+        "src/pitch-editor/swap.js",
+        "src/pitch-editor/action-menu.js",
+        "src/pitch-editor/main.js"
+      ],
+      "css": [
+        "src/pitch-editor/pitch.css",
+        "src/pitch-editor/card.css",
+        "src/pitch-editor/tooltip.css",
+        "src/pitch-editor/action-menu.css"
+      ],
       "run_at": "document_idle"
     }
   ]
