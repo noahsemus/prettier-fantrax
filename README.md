@@ -1,14 +1,15 @@
-# Fantrax Refinements
+# Prettier Fantrax
 
-Fantrax Refinements is a browser extension (with a companion iOS/Android
-app) that rebuilds the busiest screens of fantrax.com's fantasy soccer
-experience around the pitch instead of the spreadsheet. It adds a
-drag-and-drop pitch editor for setting your lineup, a head-to-head
-matchup pitch for live scoring, and stat tooltips that show both the
-raw stat and the fantasy points it earned -- everywhere, in one hover.
+Prettier Fantrax makes fantrax.com prettier -- and a lot more usable.
+It's a browser extension (with a companion iOS/Android app) that
+rebuilds the busiest screens of Fantrax's fantasy soccer experience
+around the pitch instead of the spreadsheet: a drag-and-drop pitch
+editor for setting your lineup, a head-to-head matchup pitch for live
+scoring, and stat tooltips that show both the raw stat and the fantasy
+points it earned -- everywhere, in one hover.
 
-It's built as a layer over the real site: everything it shows is read
-from the page Fantrax already renders, and everything it *does* (swaps,
+Everything is built as a layer over the real site: what it shows is
+read from the page Fantrax already renders, and what it *does* (swaps,
 trades, drops) works by driving Fantrax's own real buttons. There's no
 API access, no login handling, and nothing is ever sent anywhere --
 it's a pure content script that runs only on `fantrax.com`.
@@ -29,7 +30,8 @@ Works in Chrome and Chrome-based browsers (Edge, Brave, Arc, ...).
 2. In Chrome, open a new tab and go to `chrome://extensions`.
 3. Turn on **Developer mode** (toggle in the top-right corner).
 4. Click **Load unpacked** (top-left) and select the unzipped folder --
-   the one that contains `manifest.json`.
+   the one that contains `manifest.json`. "Prettier Fantrax" appears in
+   your extensions list.
 5. Open (or refresh) fantrax.com. That's it -- the features apply
    automatically on any `https://www.fantrax.com/*` page.
 
@@ -81,8 +83,8 @@ What you need: a Mac, a free Apple ID, your iPhone + a USB cable.
    block the app until you trust yourself as a developer: **Settings →
    General → VPN & Device Management →** tap your Apple ID **→ Trust**.
    Then run it again from Xcode.
-9. Open the app on the phone and log in to Fantrax once -- the session
-   persists from then on.
+9. Open the **Prettier Fantrax** app on the phone and log in to Fantrax
+   once -- the session persists from then on.
 
 When it expires (7 days): plug the phone back into the Mac and press
 **▶ Run** in Xcode again. Your login inside the app survives. (Free
@@ -122,7 +124,7 @@ once and can then share it with anyone.
 5. Get that file onto the phone any way you like -- message it, email
    it, or upload it somewhere and send the link (a GitHub release works
    well). On the phone, tap the file and allow **Install unknown apps**
-   when prompted. Done.
+   when prompted -- "Prettier Fantrax" lands on their home screen. Done.
 
 (Alternatively, plug your own phone in with USB debugging enabled and
 press **▶ Run** in Android Studio to install it directly.)
