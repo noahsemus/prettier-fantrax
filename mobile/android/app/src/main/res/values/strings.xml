@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Fantrax Refinements</string>
-    <string name="title_activity_main">Fantrax Refinements</string>
+    <string name="app_name">Prettier Fantrax</string>
+    <string name="title_activity_main">Prettier Fantrax</string>
     <string name="package_name">com.noahsemus.fantraxrefinements</string>
     <string name="custom_url_scheme">com.noahsemus.fantraxrefinements</string>
 </resources>
