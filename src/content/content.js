@@ -19,8 +19,12 @@
  *    before FXP/FXShared have populated window.FXP/window.FXShared.
  *    Because each mode only renders one of those two numbers at a time,
  *    this script periodically (throttled to every 30s, and only when
- *    the number of distinct players on screen changes or the throttle
- *    window has elapsed) briefly flips the Stats/Fpts toggle to the
+ *    the SET of distinct players on screen changes -- via a sorted
+ *    name signature, not just a count, since switching to a different
+ *    matchup via the page's own carousel is an SPA route change that
+ *    swaps in an entirely different set of players but usually keeps
+ *    the SAME roster size on each side -- or the throttle window has
+ *    elapsed) briefly flips the Stats/Fpts toggle to the
  *    mode NOT currently showing, so it can snapshot that view's
  *    per-player values, then flips back to whatever mode the user was
  *    already in. The user's chosen mode is never changed permanently --
@@ -72,7 +76,7 @@
   const state = {
     isToggling: false,
     lastCaptureAt: 0,
-    lastNameCount: -1,
+    lastNameSignature: null, // sorted, joined player names as of the last capture; see getPlayerNameSignature()
     rawCache: new Map(), // playerName -> Map(abbr -> raw stat value)
     fptsCache: new Map(), // playerName -> Map(abbr -> fantasy points value)
     tooltipEl: null,
@@ -113,11 +117,28 @@
     return nameA ? nameA.textContent.trim() : null;
   }
 
-  // Count of distinct players currently rendered, used as the "did the
-  // table change" signal for the capture throttle heuristic (in place
-  // of a row count, since matchup rows hold two players each).
-  function getPlayerNameCount() {
-    return document.querySelectorAll('.scoring-table__row .scorer__info__name a').length;
+  // Signature of the SET of players currently rendered, used as the "did
+  // the table change" signal for the capture throttle heuristic. Built
+  // from ".scorer__info__name a" (not row count) since matchup rows hold
+  // two players each. A plain COUNT of names is not enough: switching to
+  // a different matchup via the page's own carousel replaces every player
+  // on screen but almost always keeps the same roster size on each side,
+  // so the count alone doesn't change -- the count-based heuristic missed
+  // that case and left the caches (and window.FXC) holding the previous
+  // matchup's players, keyed by names that no longer matched anything on
+  // screen, until the time-based throttle eventually expired. Sorting
+  // before joining keeps the signature stable regardless of DOM order, so
+  // a live-score update for the SAME players (who didn't change) still
+  // produces the SAME signature and correctly falls through to the
+  // time-based throttle rather than re-snapshotting on every mutation.
+  function getPlayerNameSignature() {
+    const names = Array.from(
+      document.querySelectorAll('.scoring-table__row .scorer__info__name a')
+    )
+      .map((a) => a.textContent.trim())
+      .filter(Boolean);
+    names.sort();
+    return names.join('|');
   }
 
   function waitForNextRender() {
@@ -178,9 +199,10 @@
 
   // Whatever mode is currently active, capture it, briefly flip to the
   // OTHER mode and capture that too, then flip back to the original mode.
-  // Only runs when actually needed (player count changed, or the throttle
-  // window elapsed) -- never on every mutation. The flip itself is masked
-  // (see the header comment, point 3) so it's never visible to the user.
+  // Only runs when actually needed (the set of on-screen players changed,
+  // or the throttle window elapsed) -- never on every mutation. The flip
+  // itself is masked (see the header comment, point 3) so it's never
+  // visible to the user.
   async function snapshotCounterpart() {
     if (state.isToggling) return;
     const buttons = getModeButtons();
@@ -194,9 +216,9 @@
     const rows = getStatRows();
     if (rows.length === 0) return;
 
-    const nameCount = getPlayerNameCount();
+    const nameSignature = getPlayerNameSignature();
     const needsCapture =
-      state.lastNameCount !== nameCount || Date.now() - state.lastCaptureAt > THROTTLE_MS;
+      state.lastNameSignature !== nameSignature || Date.now() - state.lastCaptureAt > THROTTLE_MS;
     if (!needsCapture) return;
 
     state.isToggling = true;
@@ -226,7 +248,7 @@
         document.documentElement.classList.remove(MASK_CLASS);
       }
 
-      state.lastNameCount = nameCount;
+      state.lastNameSignature = nameSignature;
       state.lastCaptureAt = Date.now();
       publishFXC();
     } finally {

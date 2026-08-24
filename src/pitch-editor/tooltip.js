@@ -7,7 +7,12 @@
  * each breakdown line leads with the raw count, followed by the stat name,
  * then the signed points contribution in parentheses, e.g. "4 Saves (+2)"
  * -- falling back to the points-only form if a raw count isn't cached for
- * that stat yet.
+ * that stat yet. For a not-yet-played player who also has a pre-kickoff
+ * status dot (p.eventStatus, roster.js's FXP.EVENT_STATUS_LABEL), the
+ * dot's own explanation (e.g. "Not expected to play") is prepended as the
+ * first line, ahead of the projection line -- the dot's `title` attribute
+ * never shows on a tap/touch device, so the tooltip is what carries that
+ * explanation on mobile.
  *
  * buildTooltipLines(p) returns an array whose entries are either a plain
  * string (title/loading/projection/fallback lines, rendered via
@@ -107,10 +112,18 @@
       });
       return lines;
     }
+    // A player with an eventStatus (only ever set pre-kickoff -- see
+    // roster.js's readEventStatus) has a colored status dot next to their
+    // name on the list, but the dot's only explanation is an HTML `title`
+    // attribute, which never shows on a tap/touch device. Prepend its label
+    // (e.g. "Not expected to play") as its own line here so the tooltip
+    // itself carries that explanation on mobile too, ahead of the
+    // projection line below.
+    const statusLine = p.eventStatus ? [FXP.EVENT_STATUS_LABEL[p.eventStatus]] : [];
     const proj = state.projectedCache.get(p.name);
-    if (proj === undefined) return ['Projected points not available yet'];
+    if (proj === undefined) return [...statusLine, 'Projected points not available yet'];
     const gw = FXP.getGameweekNumber();
-    return [`Projected: ${proj} pts${gw ? ` (Gameweek ${gw})` : ''}`];
+    return [...statusLine, `Projected: ${proj} pts${gw ? ` (Gameweek ${gw})` : ''}`];
   }
 
   FXP.ensureCardTip = ensureCardTip;

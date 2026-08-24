@@ -524,7 +524,18 @@
    .fxm-card__pts too; the dark ring (box-shadow) keeps it legible even at
    the rounded corner's edge where a sliver of the green pitch can show
    through. Inset (positive offsets, not negative) so the whole dot sits
-   inside the card's box instead of straddling its edge. */
+   inside the card's box instead of straddling its edge.
+   Sitting in .fxm-card__info's bottom-left corner also puts it directly
+   over the START of .fxm-card__opp, .fxm-card__info's LAST child (the
+   game/opponent line, e.g. "MUN 0 @ HUL 2 F") -- and since that line's own
+   marquee scroll (see .fxm-card__opp--marquee below) rests flush left, the
+   dot would otherwise permanently sit on top of its first character(s).
+   render.js's renderCard adds `fxm-card--has-dot` to the CARD (only when
+   this dot actually renders) precisely so .fxm-card__opp can reserve left
+   padding clear of the dot's footprint -- see that rule below, next to
+   .fxm-card__opp's own styles. Same "keep the dot clear of card content"
+   intent as the jersey/points clearance above, just completing it for the
+   opp line too. */
 .fxm-card__dot {
   position: absolute;
   bottom: 4px;
@@ -619,6 +630,63 @@
 
 .fxm-card--bench .fxm-card__opp {
   font-size: 7.5px;
+}
+
+/* Reserve room for .fxm-card__dot -- see that rule's own comment above for
+   the full "why" (the dot sits over .fxm-card__info's bottom-left corner,
+   the same corner .fxm-card__opp's text starts from). `.fxm-card--has-dot`
+   is added by render.js's renderCard ONLY when a dot actually renders for
+   this player, so a dot-less card's opp line keeps the full card width --
+   this must NOT be unconditional on .fxm-card__opp itself.
+   Sized from the dot's own real footprint (left offset + width + the 1px
+   box-shadow ring it's drawn with, plus ~2px breathing room), MINUS
+   .fxm-card__info's own existing left padding (4px main / 3px bench,
+   which .fxm-card__opp already sits behind before this rule even applies)
+   since that padding already buys back some of the clearance:
+     main:  dot right edge = 4px left + 7px wide + 1px ring = 12px;
+            + 2px breathing = 14px clear of the card's edge;
+            - 4px .fxm-card__info padding already there = 10px here.
+     bench: dot right edge = 2px left + 5px wide + 1px ring = 8px;
+            + 2px breathing = 10px clear of the card's edge;
+            - 3px .fxm-card__info padding already there = 7px here.
+   MUST be `margin-left`, not `padding-left` -- this was verified live (see
+   this feature's own test notes) and the difference matters a lot:
+   `overflow: hidden`'s clip boundary is the element's PADDING edge, so
+   padding is "reserved" only in the untransformed resting layout -- a
+   translateX() during the marquee scroll can still paint text INSIDE that
+   padding area. Live-testing a padding-left version by sweeping
+   translateX(0) through translateX(-overflow) in small steps and measuring
+   each frame's actual visible (clip-intersected) text box against the
+   dot's rect showed the two overlapping for nearly the ENTIRE scroll (every
+   sampled step past the very first few px) -- once the leading edge of the
+   text scrolls left of the box's own edge, the clip simply pins the
+   visible edge right back at that same left edge, i.e. still directly under
+   the dot, for the rest of the animation. `margin-left` fixes this for real
+   because margin sits OUTSIDE the box -- it moves the box's own edges (and
+   therefore `overflow: hidden`'s clip boundary) away from the dot, so no
+   content at any transform value can ever be painted in that reserved zone;
+   the same sweep test with margin-left instead showed zero overlap at every
+   sampled step across the full scroll range, both main and bench.
+   Still transparent to render.js's applyMarqueeToSet, which measures
+   .fxm-card__opp's own scrollWidth/clientWidth with no JS changes needed:
+   width: auto absorbs the new margin by shrinking the box's own computed
+   width (and therefore clientWidth) by that same amount, while scrollWidth
+   (still just the unclipped text width) doesn't shrink -- so the measured
+   overflow, and thus `--fxm-marquee-dist`, grows by exactly the margin
+   amount, identical to what a same-size padding-left would have produced
+   numerically (confirmed identical overflow-px readings in testing); the
+   difference is only in WHERE the reserved space physically lives (outside
+   the box vs. inside it), which is exactly what makes margin the one that
+   actually keeps the dot clear during the scroll, not just at rest.
+   Applies unconditionally (not just under `--marquee`) since a short,
+   non-scrolling opp line on a dotted card must also start clear of the dot
+   at rest, not just once it's overflowing. */
+.fxm-card--has-dot .fxm-card__opp {
+  margin-left: 10px;
+}
+
+.fxm-card--has-dot.fxm-card--bench .fxm-card__opp {
+  margin-left: 7px;
 }
 
 /* ---------- hover breakdown tooltip ---------- */
