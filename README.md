@@ -1,5 +1,7 @@
 # Prettier Fantrax
 
+![The drag-and-drop pitch editor on the Team Roster page](screenshots/pitch-editor.png)
+
 Prettier Fantrax makes fantrax.com prettier -- and a lot more usable.
 It's a browser extension (with a companion iOS/Android app) that
 rebuilds the busiest screens of Fantrax's fantasy soccer experience
