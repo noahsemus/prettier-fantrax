@@ -42,6 +42,20 @@
     return null;
   }
 
+  // On Fantrax's mobile roster layout there's no `<img>` jersey/crest at all
+  // (the desktop-only pitch widget these rows would otherwise borrow from
+  // doesn't exist there), but every row -- mobile and desktop, roster and
+  // matchup alike -- has a `figure.scorer__image` whose crest is painted as a
+  // CSS background-image. Fall back to reading that when there's no `<img>`.
+  function readCrestFromFigure(row) {
+    const fig = row.querySelector('figure.scorer__image');
+    if (!fig) return null;
+    const bg = getComputedStyle(fig).backgroundImage;
+    if (!bg || bg === 'none') return null;
+    const m = bg.match(/^url\((['"]?)(.*)\1\)$/);
+    return m ? m[2] : null;
+  }
+
   function findRowByName(name) {
     return getListRows().find((r) => {
       const a = r.querySelector('.scorer__info__name a');
@@ -62,6 +76,7 @@
       const oppText = cells[2] ? cells[2].textContent.replace(/\s+/g, ' ').trim() : '';
       const fptsText = cells[3] ? cells[3].textContent.replace(/\s+/g, ' ').trim() : '';
       const img = row.querySelector('img');
+      const crest = img ? img.src : readCrestFromFigure(row);
       const isEmpty = !name;
       let emptyIndex = null;
       if (isEmpty) {
@@ -83,7 +98,7 @@
         emptyIndex,
         oppText,
         fptsText,
-        crest: img ? img.src : null,
+        crest,
         locked,
         eventStatus: isEmpty ? null : readEventStatus(row),
       };

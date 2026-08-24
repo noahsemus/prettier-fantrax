@@ -38,3 +38,37 @@
   color: #5b6472;
   cursor: not-allowed;
 }
+
+/* Read-only stats block (coarse-pointer/touch only -- see action-menu.js).
+   Mirrors the hover tooltip's title/row hierarchy at menu-appropriate
+   sizing. Not a button: default cursor, no hover state, doesn't act. */
+.fx-action-menu__stats {
+  cursor: default;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 6px 10px;
+}
+
+.fx-action-menu__stats-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 3px;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.fx-action-menu__stats-row {
+  font-size: 11.5px;
+  color: #cfd6de;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.fx-action-menu__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: rgba(255, 255, 255, 0.14);
+  flex: none;
+}

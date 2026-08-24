@@ -1,0 +1,709 @@
+/**
+ * Fantrax Refinements -- Matchup Pitch styles
+ * ---------------------------------------------------------------------
+ * All classes are prefixed `fxm-` (never `fx-`) -- Fantrax's own code uses
+ * an `fx-` prefix itself (fx-nav, fx-layout__pane, ...) and this
+ * extension's existing pitch-editor feature also uses `fx-card`/`fx-pitch`
+ * etc., so a distinct prefix avoids any collision with either.
+ *
+ * The single breakpoint below (760px) is what flips the pitch between the
+ * wide "horizontal" layout (teams face each other left/right) and the
+ * narrow "vertical" one (teams face each other top/bottom) -- render.js's
+ * DOM is identical in both cases; only flex-direction and which field-mark
+ * group is visible change. Kept in sync with FXM.NARROW_BREAKPOINT_PX in
+ * state.js (that constant isn't read by this file, it's just a comment
+ * pointer for anyone changing one side to change the other).
+ * ---------------------------------------------------------------------
+ */
+
+.fxm-matchup {
+  --fxm-green-1: #1e6b3a;
+  --fxm-green-2: #268049;
+  --fxm-line: rgba(255, 255, 255, 0.55);
+  margin: 12px 0 18px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+/* ---------- top bar (title + hide/show toggle) ---------- */
+
+.fxm-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0e1116;
+  padding: 8px 14px;
+  color: #f5f7fa;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fxm-topbar__title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.fxm-toggle-btn {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #cfd6de;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.15s ease;
+}
+
+.fxm-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* ---------- body layout + team headers ---------- */
+/* .fxm-body is a CSS grid so each team header can be its own top-level grid
+   item (not nested in a shared "header bar" wrapper) and get repositioned
+   purely by which named area matchup.css assigns it at each breakpoint --
+   wide: both headers share one row above the field (visually the old
+   single header bar). Narrow: home's header sits above the field next to
+   home's half, away's header sits below the field, next to away's bench --
+   see the `@media (max-width: 760px)` override below for the split. */
+.fxm-body {
+  display: grid;
+  /* minmax(0, 1fr), not plain 1fr -- a bare `1fr` track still has an
+     implicit automatic minimum width equal to its content's min-content
+     size, so an oversized grid item (e.g. .fxm-field, if its own pitch
+     cards ever force it wider than intended -- see the narrow-viewport
+     card-shrink rules below) would inflate the WHOLE column/row instead of
+     being contained by it, dragging every other item sharing that track
+     (the team headers) wider too. minmax(0, 1fr) removes that implicit
+     minimum so the track -- and everything in it -- is bounded by the grid
+     container's actual width, the same role min-width:0 plays on a flex
+     item. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "home-header away-header"
+    "field field"
+    "bench bench";
+}
+
+.fxm-team-header {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0e1116;
+  padding: 10px 14px;
+  color: #f5f7fa;
+}
+
+.fxm-team-header--home {
+  grid-area: home-header;
+}
+
+.fxm-team-header--away {
+  grid-area: away-header;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.fxm-team-header__name {
+  font-weight: 700;
+  font-size: 13px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Hero totals: the LIVE score is the whole point of this header, so it
+   reads first and reads big -- the projected total stays present but
+   deliberately secondary (small, muted) right beneath it. Stacked in a
+   column (rather than the old side-by-side row) so the hero number has
+   room to be 2-3x its old size without forcing the header wider. */
+.fxm-team-header__scores {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+
+.fxm-team-header__live {
+  color: #5be08a;
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.fxm-team-header__projected {
+  color: #9aa4b2;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+/* ---------- pitch field + markings ---------- */
+
+.fxm-field {
+  grid-area: field;
+  position: relative;
+  min-height: 480px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: row;
+  background: repeating-linear-gradient(
+    to right,
+    var(--fxm-green-1) 0px,
+    var(--fxm-green-1) 46px,
+    var(--fxm-green-2) 46px,
+    var(--fxm-green-2) 92px
+  );
+}
+
+/* Plain divs (built once per render, both mark groups always present)
+   layered under the players; CSS alone decides which orientation's group
+   is visible so no re-render is needed on resize. Deliberately NOT an SVG
+   with a square viewBox stretched to the field's real (non-square) box --
+   that non-uniform scale turned the center circle into an ellipse and
+   made every stroke width uneven axis-to-axis. Round marks below use an
+   explicit equal px width/height (never a percentage of two
+   different-length axes) so they stay circular at any field size, and
+   every border is a real px value so stroke width stays uniform. */
+.fxm-marks {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.fxm-marks__horizontal,
+.fxm-marks__vertical {
+  position: absolute;
+  inset: 0;
+}
+
+.fxm-marks__vertical {
+  display: none;
+}
+
+.fxm-marks__boundary {
+  position: absolute;
+  inset: 6px;
+  border: 1.5px solid var(--fxm-line);
+  border-radius: 6px;
+  opacity: 0.8;
+}
+
+/* halfway line -- vertical for the wide/horizontal orientation, horizontal
+   for the narrow/vertical one */
+.fxm-marks__halfway-v {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 50%;
+  width: 1.5px;
+  background: var(--fxm-line);
+  opacity: 0.8;
+}
+
+.fxm-marks__halfway-h {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  height: 1.5px;
+  background: var(--fxm-line);
+  opacity: 0.8;
+}
+
+.fxm-marks__circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 96px;
+  height: 96px;
+  margin: -48px 0 0 -48px;
+  border: 1.5px solid var(--fxm-line);
+  border-radius: 50%;
+  opacity: 0.8;
+  box-sizing: border-box;
+}
+
+.fxm-marks__spot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  background: var(--fxm-line);
+  border-radius: 50%;
+  opacity: 0.8;
+}
+
+.fxm-marks__spot--center {
+  top: 50%;
+  left: 50%;
+}
+
+.fxm-marks__spot--left {
+  top: 50%;
+  left: 10%;
+}
+
+.fxm-marks__spot--right {
+  top: 50%;
+  left: 90%;
+}
+
+.fxm-marks__spot--top {
+  top: 10%;
+  left: 50%;
+}
+
+.fxm-marks__spot--bottom {
+  top: 90%;
+  left: 50%;
+}
+
+.fxm-marks__box,
+.fxm-marks__box-inner {
+  position: absolute;
+  border: 1.5px solid var(--fxm-line);
+  opacity: 0.8;
+  box-sizing: border-box;
+}
+
+.fxm-marks__box--left {
+  left: 6px;
+  top: 26%;
+  bottom: 26%;
+  width: 15%;
+}
+
+.fxm-marks__box--right {
+  right: 6px;
+  top: 26%;
+  bottom: 26%;
+  width: 15%;
+}
+
+.fxm-marks__box-inner--left {
+  left: 6px;
+  top: 38%;
+  bottom: 38%;
+  width: 6%;
+}
+
+.fxm-marks__box-inner--right {
+  right: 6px;
+  top: 38%;
+  bottom: 38%;
+  width: 6%;
+}
+
+.fxm-marks__box--top {
+  top: 6px;
+  left: 26%;
+  right: 26%;
+  height: 15%;
+}
+
+.fxm-marks__box--bottom {
+  bottom: 6px;
+  left: 26%;
+  right: 26%;
+  height: 15%;
+}
+
+.fxm-marks__box-inner--top {
+  top: 6px;
+  left: 38%;
+  right: 38%;
+  height: 6%;
+}
+
+.fxm-marks__box-inner--bottom {
+  bottom: 6px;
+  left: 38%;
+  right: 38%;
+  height: 6%;
+}
+
+.fxm-half {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.fxm-line {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+/* ---------- player cards ---------- */
+
+.fxm-card {
+  position: relative;
+  width: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: default;
+}
+
+.fxm-card__crest {
+  width: auto;
+  height: 40px;
+  max-width: 46px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+
+/* Translucent dark plate behind the name/points, mirroring the
+   .fx-card__info treatment in pitch-editor/card.css -- the pitch
+   background is bright green and varies row to row, so plain white text
+   isn't reliably legible without it. Own class, own file: not shared with
+   pitch-editor's CSS. */
+.fxm-card__info {
+  align-self: stretch;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 6px;
+  padding: 2px 4px 3px;
+  margin-top: 2px;
+}
+
+.fxm-card__name {
+  font-size: 10px;
+  color: #fff;
+  text-align: center;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.fxm-card__name-text {
+  display: inline-block;
+}
+
+/* Applied by render.js's applyNameMarquee only when the name actually
+   overflows its card -- a name that fits stays exactly as it was (plain
+   ellipsis-capable, non-animated). No ellipsis here: the whole point is
+   the full name stays readable, just scrolled into view over time instead
+   of cut off. */
+.fxm-card__name--marquee {
+  text-overflow: clip;
+}
+
+.fxm-card__name--marquee .fxm-card__name-text {
+  animation: fxm-marquee 6s ease-in-out infinite alternate;
+}
+
+@keyframes fxm-marquee {
+  0%,
+  15% {
+    transform: translateX(0);
+  }
+  85%,
+  100% {
+    transform: translateX(var(--fxm-marquee-dist));
+  }
+}
+
+/* Game-state dot, rendered by render.js's renderCard just before the
+   (possibly marquee-animated) name-text span so it always stays static --
+   see gameDotInfo/marqueeKey in render.js. Deliberately its OWN color
+   palette, distinct from .fxm-card__pts's gold/red pos/neg colors just
+   below: those already mean "positive/negative points" on this same card,
+   so reusing green/red here for "game state" would read as a second,
+   conflicting points signal instead of "did they even play yet". */
+.fxm-card__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 3px;
+  margin-bottom: 1px;
+  box-sizing: border-box;
+}
+
+/* Finished: solid, neutral/light -- their number on the card is a real
+   (possibly zero) result. */
+.fxm-card__dot--finished {
+  background: #e7ecf2;
+}
+
+/* Upcoming: hollow -- their number on the card is a forced zero, not yet a
+   real result (see render.js's isUpcoming). Outlined rather than filled so
+   it reads as "empty/not started" at a glance, distinct from the solid
+   finished dot. */
+.fxm-card__dot--upcoming {
+  background: transparent;
+  border: 1.3px solid #9aa4b2;
+}
+
+.fxm-card__pts {
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  margin-top: 1px;
+}
+
+.fxm-card__pts--pos {
+  color: #ffd166;
+}
+
+.fxm-card__pts--neg {
+  color: #ff8a80;
+}
+
+.fxm-card__pts--zero {
+  color: #aeb8c4;
+}
+
+/* ---------- hover breakdown tooltip ---------- */
+/* Own `fxm-` classes mirroring pitch-editor/tooltip.css's `.fx-card-tip`
+   pattern exactly (fixed position, viewport-clamped by render.js's JS, own
+   stacking context) so the two features' tooltips never collide. */
+
+.fxm-tip {
+  position: fixed;
+  z-index: 2147483647;
+  background: #12181f;
+  color: #f5f7fa;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  line-height: 1.5;
+  pointer-events: none;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  width: max-content;
+  max-width: min(260px, calc(100vw - 16px));
+  box-sizing: border-box;
+  display: none;
+}
+
+.fxm-tip--visible {
+  display: block;
+}
+
+.fxm-tip__title {
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 3px;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.fxm-tip__row {
+  color: #cfd6de;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Color-coded parenthetical signed-points suffix on a stat line, e.g. the
+   "(+6)" in "1 Assists (Total) (+6)" -- its own span (see render.js's
+   showTooltip) so it can carry a color independent of the row's text. */
+.fxm-tip__stat--pos {
+  color: #5be08a;
+}
+
+.fxm-tip__stat--neg {
+  color: #ff8a80;
+}
+
+.fxm-tip__stat--zero {
+  color: #9aa4b2;
+}
+
+/* ---------- bench strip ---------- */
+
+.fxm-bench-bar {
+  grid-area: bench;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  background: #14181f;
+  padding: 10px 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fxm-bench {
+  flex: 1;
+  min-width: 0;
+}
+
+.fxm-bench--away {
+  text-align: right;
+}
+
+.fxm-bench__label {
+  color: #9aa4b2;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.fxm-bench__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.fxm-bench--away .fxm-bench__row {
+  justify-content: flex-end;
+}
+
+/* Bench cards are the exact same .fxm-card component as the pitch (see
+   "player cards" above) -- this modifier just shrinks it to fit a wrapping
+   strip instead of a fixed pitch line. */
+.fxm-card--bench {
+  width: 52px;
+}
+
+.fxm-card--bench .fxm-card__crest {
+  height: 28px;
+  max-width: 32px;
+}
+
+.fxm-card--bench .fxm-card__info {
+  padding: 1px 3px 2px;
+  margin-top: 1px;
+}
+
+.fxm-card--bench .fxm-card__name {
+  font-size: 8.5px;
+}
+
+.fxm-card--bench .fxm-card__dot {
+  width: 5px;
+  height: 5px;
+  margin-right: 2px;
+}
+
+.fxm-card--bench .fxm-card__pts {
+  font-size: 9.5px;
+  margin-top: 0;
+}
+
+/* ---------- narrow viewport: vertical pitch ---------- */
+
+@media (max-width: 760px) {
+  .fxm-marks__horizontal {
+    display: none;
+  }
+
+  .fxm-marks__vertical {
+    display: block;
+  }
+
+  /* Narrower field width in this orientation -- shrink the center circle
+     to match (still a fixed equal px width/height, so still perfectly
+     round; only the size differs). */
+  .fxm-marks__circle {
+    width: 76px;
+    height: 76px;
+    margin: -38px 0 0 -38px;
+  }
+
+  .fxm-field {
+    flex-direction: column;
+    min-height: 620px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--fxm-green-1) 0px,
+      var(--fxm-green-1) 46px,
+      var(--fxm-green-2) 46px,
+      var(--fxm-green-2) 92px
+    );
+  }
+
+  .fxm-half {
+    flex-direction: column;
+  }
+
+  .fxm-line {
+    flex-direction: row;
+  }
+
+  /* Split the two team headers onto opposite sides of the field: home's
+     stays above (next to home's half), away's moves below (next to away's
+     bench) instead of stacking together above the field. Single column so
+     each header's area is now its own full-width grid row. */
+  .fxm-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "home-header"
+      "field"
+      "away-header"
+      "bench";
+  }
+
+  .fxm-team-header--away {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .fxm-bench-bar {
+    flex-direction: column;
+  }
+
+  .fxm-bench--away {
+    text-align: left;
+  }
+
+  .fxm-bench--away .fxm-bench__row {
+    justify-content: flex-start;
+  }
+
+  /* A full 5-wide line (e.g. defense/midfield) of fixed 76px pitch cards
+     doesn't fit a narrow viewport once .fxm-line flips to row direction
+     above -- .fxm-half/.fxm-line both already have `min-width: 0` so
+     they're WILLING to shrink, but nothing upstream forces them to: five
+     76px cards plus gaps (~420px) simply become the half/line/field's own
+     preferred content width, which .fxm-matchup's `overflow: hidden`
+     then silently clips on the right instead of visibly scrolling --
+     either way, real cards end up cut off-screen on a ~380-400px-wide
+     phone viewport. Fix at the source: shrink just the un-modified
+     (non-bench -- that's already its own compact 52px size at every
+     width) pitch card, and tighten the line's gap, so a 5-across line
+     comfortably fits. 5 * 58px + 4 * 6px gap = 314px, well inside a real
+     phone's available width even after Fantrax's own page chrome margins
+     (measured ~380-390px on a 414px-wide viewport). */
+  .fxm-line {
+    gap: 6px;
+  }
+
+  .fxm-card:not(.fxm-card--bench) {
+    width: 58px;
+  }
+
+  .fxm-card:not(.fxm-card--bench) .fxm-card__crest {
+    height: 32px;
+    max-width: 36px;
+  }
+
+  .fxm-card:not(.fxm-card--bench) .fxm-card__name {
+    font-size: 9px;
+  }
+
+  .fxm-card:not(.fxm-card--bench) .fxm-card__pts {
+    font-size: 10px;
+  }
+}

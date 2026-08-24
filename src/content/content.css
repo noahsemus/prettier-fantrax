@@ -20,6 +20,22 @@
   display: block;
 }
 
+/* Colored (+N)/(-N) points span inside the hybrid stat tooltip -- see
+   content.js's showTooltip(). Distinct names from pitch-editor/tooltip.css's
+   .fx-tip-pts* classes since content.css is the only stylesheet guaranteed
+   loaded alongside this script. */
+.fx-tooltip__pts--pos {
+  color: #5be08a;
+}
+
+.fx-tooltip__pts--neg {
+  color: #ff8a80;
+}
+
+.fx-tooltip__pts--zero {
+  color: #aeb8c4;
+}
+
 /* Give the simple-view stat abbreviations a hover affordance so it's
    discoverable that they now do something. */
 .scoring-table__cell__content li > b {

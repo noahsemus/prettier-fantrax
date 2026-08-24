@@ -8,6 +8,24 @@
  * picker, Drop confirmation, and full player-card modal (Stats/Splits/
  * News/Watch List/Compare/Notes, all of Fantrax's own UI) open exactly as
  * they would from the real list, so none of that needs reimplementing here.
+ *
+ * Touch devices have no hover, so the points-breakdown/projection tooltip
+ * (tooltip.js's FXP.buildTooltipLines) is otherwise unreachable there. On a
+ * coarse-pointer device (checked at open time), this menu prepends a
+ * read-only stats section above the action buttons with exactly those
+ * tooltip lines, separated by a divider -- a static, non-clickable block
+ * that just happens to live inside the same menu; it doesn't add any
+ * behavior to the doc-click-outside-closes-menu or Escape-closes-menu
+ * logic below. Desktop (fine pointer) keeps the plain button-only menu,
+ * since the hover tooltip already covers stats there.
+ *
+ * buildTooltipLines() entries are either plain strings or hybrid
+ * { text, pts } objects (see tooltip.js); buildStatsSection renders both
+ * via tooltip.js's shared FXP.renderTipLine(), so the colored (+N)/(-N)
+ * points span looks identical here and in the hover tooltip. This relies
+ * on tooltip.css's .fx-tip-pts* classes, which are safe to reuse here since
+ * manifest.json loads tooltip.css and action-menu.css together on the same
+ * roster-page content script entry.
  * ---------------------------------------------------------------------
  */
 (function (FXP) {
@@ -44,6 +62,28 @@
     ];
   }
 
+  function isCoarsePointer() {
+    return window.matchMedia('(pointer: coarse)').matches;
+  }
+
+  // Read-only stats block for touch devices (no hover => no tooltip access).
+  // Mirrors the hover tooltip's own line styling (title + muted rows), just
+  // sized for the menu. Returns null when there's nothing to show, so the
+  // caller can skip the section (and its divider) entirely.
+  function buildStatsSection(p) {
+    const lines = FXP.buildTooltipLines(p);
+    if (!lines || !lines.length) return null;
+    const section = document.createElement('div');
+    section.className = 'fx-action-menu__stats';
+    lines.forEach((line, i) => {
+      const row = document.createElement('div');
+      row.className = i === 0 ? 'fx-action-menu__stats-title' : 'fx-action-menu__stats-row';
+      FXP.renderTipLine(row, line);
+      section.appendChild(row);
+    });
+    return section;
+  }
+
   function onDocClick(e) {
     if (state.actionMenuEl && !state.actionMenuEl.contains(e.target)) closeActionMenu();
   }
@@ -77,6 +117,17 @@
 
     const menu = document.createElement('div');
     menu.className = 'fx-action-menu';
+
+    if (isCoarsePointer()) {
+      const statsSection = buildStatsSection(p);
+      if (statsSection) {
+        menu.appendChild(statsSection);
+        const divider = document.createElement('div');
+        divider.className = 'fx-action-menu__divider';
+        menu.appendChild(divider);
+      }
+    }
+
     buildMenuItems(p).forEach((item) => {
       const btn = document.createElement('button');
       btn.type = 'button';

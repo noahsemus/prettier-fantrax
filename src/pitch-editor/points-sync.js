@@ -8,8 +8,42 @@
  * same approach as content.js's Stats/Fpts toggle on the live-scoring page
  * -- this briefly flips those real controls to snapshot the data, then
  * flips them back to whatever the user had. The pitch/bench view itself
- * doesn't move (the real list is hidden underneath it), but the controls
- * above it will visibly flicker for ~2s while this runs.
+ * doesn't move (the real list is hidden underneath it).
+ *
+ * Each run visits the Fantasy Points tab (per-stat points contributions,
+ * `breakdownCache`) *and* the Stats tab (the same rows' raw counting
+ * stats, `rawStatsCache`) so the hover tooltip can show both together, e.g.
+ * "4 Saves (+2 pts)". The Stats tab is visited last and the original tab
+ * is restored from there.
+ *
+ * The "Stats" period dropdown opens as a `mat-select` overlay -- on mobile
+ * that overlay renders as a huge sheet, and the tab bar is a scrolling
+ * strip, so without care this scrape reads as the whole page flickering
+ * between filters. Two mitigations, both scoped to this file:
+ *   1. While a sync is in flight we add `fx-syncing` to <html> and inject
+ *      a one-time stylesheet that hides `.cdk-overlay-container` (and
+ *      freezes its transitions), so the programmatically-opened dropdown
+ *      sheet never actually paints. Only the brief Fantasy Points/Stats
+ *      tab flip stays visible -- we don't hide the tab bar itself, since
+ *      blanking it would just trade one flicker for another.
+ *   2. On coarse-pointer (touch/mobile) devices we skip the normal 60s
+ *      re-scrape throttle entirely and only sync when the Gameweek
+ *      changes (or on a fresh page load) -- rare enough that the tab flip
+ *      is a non-issue. Desktop keeps the 60s cadence.
+ * A run that ends without committing fresh caches (unexpected layout, a
+ * menu already open, a mid-flight abort) also backs off for
+ * POINTS_SYNC_RETRY_MS before the next attempt, so a page that doesn't
+ * match our expected layout doesn't retry on every render.
+ *
+ * Two more cases are treated as non-commits, both guarding against
+ * scraping a gameweek's table while it's still mid-load right after a
+ * gameweek switch: (1) if the Gameweek select no longer reads the same
+ * value it did when this run started, the scrape belongs to a gameweek
+ * that's no longer current, so it's discarded rather than committed over
+ * good data; (2) if the roster visibly has players but the scrape came
+ * back with zero rows, that's read as a still-loading table rather than a
+ * genuinely empty breakdown, so it's discarded too. Both fall through to
+ * the same `committed=false` backoff/retry path as any other failure.
  * ---------------------------------------------------------------------
  */
 (function (FXP) {
@@ -18,6 +52,29 @@
   const delay = FXP.delay;
   const state = FXP.state;
   const overlayChildCount = FXP.overlayChildCount;
+
+  // Defensive: state.js (owned elsewhere) may not yet declare this cache.
+  state.rawStatsCache = state.rawStatsCache || new Map();
+
+  // Local-only constants (state.js is owned elsewhere -- see file header).
+  const POINTS_SYNC_RETRY_MS = 15000; // backoff before retrying a run that didn't commit fresh caches
+  const SYNC_STYLE_ID = 'fx-sync-style';
+
+  function isCoarsePointer() {
+    // Evaluated at call time, not cached at module load -- device emulation
+    // (devtools, or a real device's mode switch) can toggle this live.
+    return window.matchMedia('(pointer: coarse)').matches;
+  }
+
+  function ensureSyncStyle() {
+    if (document.getElementById(SYNC_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = SYNC_STYLE_ID;
+    style.textContent =
+      '.fx-syncing .cdk-overlay-container { visibility: hidden !important; }\n' +
+      '.fx-syncing .cdk-overlay-container * { transition: none !important; }';
+    document.head.appendChild(style);
+  }
 
   function findStatsTabs() {
     const buttons = qa('button.tabs__item');
@@ -64,7 +121,16 @@
   function readAllRows() {
     const out = [];
     qa('.i-table').forEach((t) => {
-      const headerRow = t.querySelector('.i-table__row--header') || t.querySelector('[class*="header"]');
+      // Desktop marks the header row `.i-table__row--header`. Mobile has no
+      // such row -- its real header is `.i-table__row.i-table__header`, but
+      // an *empty* decoy `div.single-header` (zero `.i-table__cell` kids)
+      // also matches the old catch-all `[class*="header"]` selector and
+      // would sort first, yielding an empty `headers` array. Pick the first
+      // candidate that actually has header cells instead.
+      const headerRow = qa(
+        '.i-table__row--header, .i-table__row.i-table__header, [class*="header"]',
+        t
+      ).find((r) => r.querySelector(':scope > .i-table__cell'));
       if (!headerRow) return;
       const headers = qa(':scope > .i-table__cell', headerRow).map((c) => c.textContent.trim());
       qa('.i-table__row', t).forEach((row) => {
@@ -79,23 +145,40 @@
 
   function maybeSyncPointsData() {
     if (state.pointsSyncInFlight) return;
+    if (Date.now() - (state.pointsLastAttemptAt || 0) < POINTS_SYNC_RETRY_MS) return; // just tried and failed/aborted -- back off
+
     const gwKey = getGameweekNumber();
+    if (gwKey !== state.pointsCacheGwKey) {
+      syncPointsData(); // new gameweek (or first load ever) -- always resync
+      return;
+    }
+    if (isCoarsePointer()) return; // mobile: only resync on a gameweek change, never on the 60s throttle
+
     const stale = Date.now() - state.pointsCacheAt > FXP.POINTS_SYNC_THROTTLE_MS;
-    if (stale || gwKey !== state.pointsCacheGwKey) syncPointsData();
+    if (stale) syncPointsData();
   }
 
   async function syncPointsData() {
     if (state.pointsSyncInFlight || state.busy) return;
     const tabs = findStatsTabs();
     const periodSelect = findSelectByLabel('Stats');
-    if (!tabs || !periodSelect) return; // page isn't laid out as expected -- skip silently
-    if (overlayChildCount() > 0) return; // don't fight an already-open menu
+    if (!tabs || !periodSelect) {
+      state.pointsLastAttemptAt = Date.now(); // page isn't laid out as expected -- skip silently, but don't retry every render
+      return;
+    }
+    if (overlayChildCount() > 0) {
+      state.pointsLastAttemptAt = Date.now(); // don't fight an already-open menu
+      return;
+    }
 
     state.pointsSyncInFlight = true;
     state.busy = true;
+    ensureSyncStyle();
+    document.documentElement.classList.add('fx-syncing');
     const originalTabBtn = tabs.buttons.find(isTabSelected) || tabs.stats;
     const originalPeriodText = periodSelect.textContent.trim();
     const gwKey = getGameweekNumber();
+    let committed = false;
 
     try {
       if (originalTabBtn !== tabs.fpts) {
@@ -123,19 +206,65 @@
         await chooseSelectOption(periodSelect, originalPeriodText);
       }
 
-      if (originalTabBtn !== tabs.fpts) {
+      // Stats tab: the same rows' raw counting stats. A stat can be worth 0
+      // points yet still have a meaningful raw count (e.g. 0-value saves),
+      // so keep every non-empty cell here rather than the breakdown loop's
+      // "truthy points" filter -- only '-'/empty (no stat recorded) is skipped.
+      tabs.stats.click();
+      await delay(500);
+      if (overlayChildCount() > 0) return;
+
+      const raw = new Map();
+      readAllRows().forEach(({ name, headers, cells }) => {
+        const statMap = new Map();
+        for (let i = 5; i < headers.length && i < cells.length; i++) {
+          const text = cells[i];
+          if (text === '' || text === '-') continue;
+          statMap.set(headers[i], text);
+        }
+        raw.set(name, statMap);
+      });
+
+      // We always end this run on the Stats tab (above), so restore
+      // whatever the user actually had selected, whenever that differs.
+      if (originalTabBtn !== tabs.stats) {
         originalTabBtn.click();
         await delay(400);
       }
 
-      state.breakdownCache = breakdown;
-      state.projectedCache = projected;
-      state.pointsCacheAt = Date.now();
-      state.pointsCacheGwKey = gwKey;
-      FXP.refreshOpenTooltip();
+      // Guard 1: the gameweek select changed while we were mid-scrape (the
+      // user flipped gameweeks again, or the new gameweek's table only
+      // just finished swapping in under us). gwKey was captured at the
+      // start of this run, so a mismatch here means everything we just
+      // read belongs to a gameweek that's no longer current -- committing
+      // it would overwrite good data with stale/wrong data. Leave the
+      // existing caches alone; the `committed=false` backoff path below
+      // will retry in POINTS_SYNC_RETRY_MS once things settle.
+      const gwChangedMidSync = getGameweekNumber() !== gwKey;
+
+      // Guard 2: an obviously-empty scrape. If the roster visibly has
+      // players but readAllRows() found no rows/headers to read (breakdown
+      // ends up empty), the table was almost certainly still mid-load when
+      // we scraped it -- don't commit that as "the roster has no points
+      // data". A roster that's *actually* empty (no name links at all) has
+      // nothing false to report, so that case is still allowed to commit.
+      const rosterHasPlayers = !!document.querySelector('.i-table .scorer__info__name a');
+      const emptyScrape = rosterHasPlayers && breakdown.size === 0;
+
+      if (!gwChangedMidSync && !emptyScrape) {
+        state.breakdownCache = breakdown;
+        state.rawStatsCache = raw;
+        state.projectedCache = projected;
+        state.pointsCacheAt = Date.now();
+        state.pointsCacheGwKey = gwKey;
+        committed = true;
+        FXP.refreshOpenTooltip();
+      }
     } catch (err) {
       // best-effort background sync -- leave the previous cache in place
     } finally {
+      if (!committed) state.pointsLastAttemptAt = Date.now(); // didn't finish -- back off before the next attempt
+      document.documentElement.classList.remove('fx-syncing');
       state.pointsSyncInFlight = false;
       state.busy = false;
     }

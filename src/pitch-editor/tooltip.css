@@ -34,3 +34,18 @@
   white-space: normal;
   overflow-wrap: break-word;
 }
+
+/* Colored (+N)/(-N) points span inside a hybrid stat line -- see
+   tooltip.js's renderTipLine(). Also reused by action-menu.js's
+   buildStatsSection, which shares this stylesheet on the roster page. */
+.fx-tip-pts--pos {
+  color: #5be08a;
+}
+
+.fx-tip-pts--neg {
+  color: #ff8a80;
+}
+
+.fx-tip-pts--zero {
+  color: #aeb8c4;
+}

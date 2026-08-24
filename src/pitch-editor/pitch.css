@@ -41,6 +41,14 @@
 
 .fx-pitch__field {
   position: relative;
+  /* Clips the center circle's lower half (see .fx-pitch-marks__circle) --
+     its center sits exactly on the bottom boundary line so only the top
+     half bulges visibly into the field, same as a real pitch's halfway
+     line. Safe for drag/drop: native HTML5 drag uses a browser-painted
+     drag image (not a repositioned DOM node) and the touch-drag ghost is
+     `position: fixed` on <body> (see drag.js createTouchGhost), so neither
+     is clipped by this. */
+  overflow: hidden;
   background: repeating-linear-gradient(
     to bottom,
     var(--fx-green-1) 0px,
@@ -62,6 +70,113 @@
   border-radius: 6px;
   pointer-events: none;
   opacity: 0.6;
+}
+
+/* ---------- pitch markings (goal end at top, half center-circle at bottom) ----------
+   This pitch renders ONE team's half: GK row at top down to F row near the
+   bottom, so the goal end belongs at the top and the bottom edge doubles as
+   the halfway line (its line is already drawn by .fx-pitch__field::before
+   above -- no separate halfway-line element needed). Built once per render
+   in render.js (buildPitchMarks) and appended before the position rows;
+   rows already sit at z-index: 1 so they layer on top of these regardless
+   of DOM order.
+
+   Same technique as matchup.css's `.fxm-marks`: plain divs, not an SVG with
+   a square viewBox stretched over the field's non-square box -- that
+   non-uniform scale turns circles into ellipses and strokes uneven
+   axis-to-axis. Round marks (circle, spots) use a fixed equal px
+   width/height -- never a percentage of two different-length axes -- so
+   they stay circular at any field width; rectangular marks use % width so
+   they stretch with the field like the boundary above. */
+.fx-pitch-marks {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.fx-pitch-marks__box {
+  position: absolute;
+  top: 8px;
+  border: 1.5px solid var(--fx-line);
+  border-top: none; /* open onto the goal line, like a real box */
+  opacity: 0.6;
+  box-sizing: border-box;
+}
+
+.fx-pitch-marks__box--18 {
+  left: 20%;
+  right: 20%;
+  height: 64px;
+}
+
+.fx-pitch-marks__box--6 {
+  left: 37%;
+  right: 37%;
+  height: 28px;
+}
+
+.fx-pitch-marks__goal {
+  position: absolute;
+  top: -3px; /* pokes slightly above the boundary line, sitting on the goal line */
+  left: 45%;
+  right: 45%;
+  height: 7px;
+  border: 1.5px solid var(--fx-line);
+  border-bottom: none; /* open toward the pitch */
+  opacity: 0.6;
+  box-sizing: border-box;
+}
+
+.fx-pitch-marks__spot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  background: var(--fx-line);
+  border-radius: 50%;
+  opacity: 0.6;
+}
+
+.fx-pitch-marks__spot--penalty {
+  top: 56px;
+  left: 50%;
+}
+
+.fx-pitch-marks__spot--center {
+  left: 50%;
+  bottom: 6px; /* 8px boundary inset - 2px radius: centers the dot on the halfway line */
+  margin: 0 0 0 -2px;
+}
+
+.fx-pitch-marks__circle {
+  position: absolute;
+  left: 50%;
+  /* 8px (boundary inset, i.e. the halfway line's position) - 45px (radius):
+     centers the circle exactly on the halfway line so it bulges up into
+     the field; the lower half falls outside .fx-pitch__field's border box
+     and is clipped by its overflow: hidden. */
+  bottom: -37px;
+  width: 90px;
+  height: 90px;
+  margin-left: -45px;
+  border: 1.5px solid var(--fx-line);
+  border-radius: 50%;
+  opacity: 0.6;
+  box-sizing: border-box;
+}
+
+/* Narrow (mobile, ~414px) viewports get a proportionally smaller field --
+   shrink the circle to match, same fixed-px approach matchup.css uses at
+   its own breakpoint. Box marks need no adjustment: their % widths already
+   scale with the field. */
+@media (max-width: 480px) {
+  .fx-pitch-marks__circle {
+    width: 64px;
+    height: 64px;
+    margin-left: -32px;
+    bottom: -24px; /* 8px - 32px radius */
+  }
 }
 
 .fx-pitch__row {
@@ -134,4 +249,28 @@
 
 .fx-pitch-tab--active:hover {
   background: #1e6b3a;
+}
+
+/* Touch: keep a tap-and-hold on a card from triggering iOS's text-selection
+   callout or Android's native "copy/share" context menu -- that gesture is
+   reserved for lifting the card into drag mode (see drag.js touchstart). */
+.fx-card,
+.fx-card * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Floating clone that tracks the finger during a touch drag (drag.js
+   createTouchGhost). The real card stays in place, dimmed via the same
+   .fx-card--dragging rule the mouse path uses, so layout doesn't shift
+   under the thumb -- this is the "lifted" feedback the user actually sees. */
+.fx-card--touch-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 99999;
+  transform: scale(1.08);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(91, 224, 138, 0.5);
+  opacity: 0.95;
+  transition: none;
 }

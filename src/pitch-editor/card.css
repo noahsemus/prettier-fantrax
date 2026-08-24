@@ -89,6 +89,23 @@
   pointer-events: none;
 }
 
+/* Groups the name/fpts/opp text below the jersey on its own translucent dark
+   plate -- the pitch background is bright green and varies row to row, so
+   white text alone isn't reliably legible without it. Stretches to the
+   card's full (fixed) width regardless of how narrow its own text is. The
+   card's own :hover background (above) sits underneath this and is mostly
+   swallowed by it -- keep the alpha here moderate so a hover still reads as
+   a highlight rather than the text going fully opaque-on-black. */
+.fx-card__info {
+  align-self: stretch;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 6px;
+  padding: 2px 5px 3px;
+  /* Centers all children (name/fpts/opp, and anything added later) in one
+     place rather than relying on each child to carry its own text-align. */
+  text-align: center;
+}
+
 .fx-card__name {
   font-size: 10.5px;
   color: #fff;
@@ -101,6 +118,42 @@
   pointer-events: none;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   margin-top: 1px;
+}
+
+/* Long names that don't fit in the 84px box marquee instead of truncating.
+   render.js measures every card after each render and only adds this class
+   (plus --fx-marquee-dist, how far left the inner span needs to travel) to
+   names that actually overflow -- names that fit are left completely alone.
+   The event-status dot lives outside `.fx-card__name-inner` (see renderCard
+   in render.js) so it stays fixed in place while only the name text
+   scrolls. text-overflow only matters for the non-marquee ellipsis case
+   above, but `clip` here avoids Safari/Firefox drawing an ellipsis over the
+   animating text at the extremes of its travel. */
+.fx-card__name--marquee {
+  text-overflow: clip;
+}
+
+.fx-card__name-inner {
+  display: inline-block;
+  will-change: transform;
+}
+
+.fx-card__name--marquee .fx-card__name-inner {
+  animation: fx-marquee 6s ease-in-out infinite alternate;
+}
+
+/* Hold at each extreme (0%-15% and 85%-100%) so the reader gets a beat to
+   start/finish reading before the direction reverses, instead of the text
+   immediately snapping into motion. */
+@keyframes fx-marquee {
+  0%,
+  15% {
+    transform: translateX(0);
+  }
+  85%,
+  100% {
+    transform: translateX(var(--fx-marquee-dist));
+  }
 }
 
 /* Fantrax's own real-life "is this player playing" indicator, reused here.
