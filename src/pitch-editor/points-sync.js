@@ -30,6 +30,16 @@
  *      re-scrape throttle entirely and only sync when the Gameweek
  *      changes (or on a fresh page load) -- rare enough that the tab flip
  *      is a non-issue. Desktop keeps the 60s cadence.
+ *   3. The tab flip and the period dropdown are both real Angular route/
+ *      query-param navigations (the URL's view= param actually changes) --
+ *      live-verified that either one trips Fantrax's own "Unsaved Changes"
+ *      route guard whenever the user has a pending, unsubmitted lineup
+ *      edit, popping its Leave/Stay modal on every sync cycle for as long
+ *      as they sit mid-edit (the reported bug: it kept asking "sure you
+ *      want to leave" while making several roster changes in a row). See
+ *      hasPendingLineupChanges() -- syncPointsData skips the whole run
+ *      whenever it's true, and resumes on its own the moment the change is
+ *      submitted or discarded.
  * A run that ends without committing fresh caches (unexpected layout, a
  * menu already open, a mid-flight abort) also backs off for
  * POINTS_SYNC_RETRY_MS before the next attempt, so a page that doesn't
@@ -74,6 +84,29 @@
       '.fx-syncing .cdk-overlay-container { visibility: hidden !important; }\n' +
       '.fx-syncing .cdk-overlay-container * { transition: none !important; }';
     document.head.appendChild(style);
+  }
+
+  // True whenever Fantrax is showing its own "Finalize all roster changes"
+  // toast (Reset/Submit buttons) -- i.e. the user has an unsubmitted lineup
+  // edit pending. Live-verified root cause of a real bug: the Fantasy
+  // Points/Stats tab flip below, AND just OPENING the "Stats: <period>"
+  // mat-select, are both real Angular route/query-param navigations (the
+  // page's URL literally flips view=FPTS <-> view=STATS) -- so while a
+  // change is pending, either one trips Fantrax's own CanDeactivate route
+  // guard and pops its "Unsaved Changes" Leave/Stay modal, on every sync
+  // cycle, for as long as the user sits mid-edit. That's exactly the
+  // reported symptom ("keeps popping up asking if I'm sure I want to leave
+  // ... every time"). Confirmed live: with a pending change, clicking the
+  // real Stats tab -- or even just opening the period dropdown -- opened
+  // the guard modal immediately and blocked the navigation (the URL's view
+  // param didn't move); leaving the page alone with nothing clicked at all
+  // reproduced the same modal within ~10s purely from this file's own
+  // background scrape cadence. The toast is a `<toast>` custom element;
+  // matched by its exact heading text rather than its class list (which
+  // also covers Fantrax's other, differently-purposed toasts) since that
+  // text is stable and unambiguous.
+  function hasPendingLineupChanges() {
+    return qa('toast').some((t) => t.textContent.includes('Finalize all roster changes'));
   }
 
   function findStatsTabs() {
@@ -168,6 +201,17 @@
     // showing indefinitely, since neither guard ever reaches the
     // try/finally block that normally marks the attempt done.
     const earlyGwKey = getGameweekNumber();
+    if (hasPendingLineupChanges()) {
+      // Flipping tabs (or even just opening the period dropdown) right now
+      // would trip Fantrax's own route guard -- see hasPendingLineupChanges
+      // above. Back off exactly like the other early-return guards below;
+      // maybeSyncPointsData() naturally retries in POINTS_SYNC_RETRY_MS, and
+      // resumes its normal cadence on its own the moment the pending change
+      // is gone (submitted or discarded) -- nothing else has to notice.
+      state.pointsLastAttemptAt = Date.now();
+      state.pointsSyncAttemptedGwKey = earlyGwKey;
+      return;
+    }
     const tabs = findStatsTabs();
     const periodSelect = findSelectByLabel('Stats');
     if (!tabs || !periodSelect) {
@@ -306,6 +350,7 @@
     }
   }
 
+  FXP.hasPendingLineupChanges = hasPendingLineupChanges;
   FXP.findStatsTabs = findStatsTabs;
   FXP.isTabSelected = isTabSelected;
   FXP.findSelectByLabel = findSelectByLabel;

@@ -23,10 +23,11 @@ section.)
 
 Works in Chrome and Chrome-based browsers (Edge, Brave, Arc, ...).
 
-1. Download this repo: on the GitHub page, click the green **Code**
-   button, then **Download ZIP**, and unzip it somewhere permanent.
-   (Chrome loads the extension straight from this folder every time, so
-   don't delete or move it afterwards.)
+1. Grab the extension ZIP from the [latest
+   release](https://github.com/noahsemus/prettier-fantrax/releases/latest)
+   and unzip it somewhere permanent. (Chrome loads the extension
+   straight from this folder every time, so don't delete or move it
+   afterwards.)
 2. In Chrome, open a new tab and go to `chrome://extensions`.
 3. Turn on **Developer mode** (toggle in the top-right corner).
 4. Click **Load unpacked** (top-left) and select the unzipped folder --
@@ -38,8 +39,8 @@ Works in Chrome and Chrome-based browsers (Edge, Brave, Arc, ...).
 No permissions beyond running on fantrax.com are requested, and nothing
 is sent off the page -- it's a pure content script.
 
-To update later: download the new ZIP, replace the folder's contents,
-and click the refresh icon on the extension's card in
+To update later: download the new release ZIP, replace the folder's
+contents, and click the refresh icon on the extension's card in
 `chrome://extensions`.
 
 ### On an iPhone (free -- no Apple Developer account)
@@ -129,10 +130,11 @@ once and can then share it with anyone.
 (Alternatively, plug your own phone in with USB debugging enabled and
 press **▶ Run** in Android Studio to install it directly.)
 
-**Heads-up on both phone versions:** the mobile app is at Phase 1 -- the
-shell works and the scripts load, but the features were built against
-Fantrax's desktop layout and may not fully work on the mobile site yet.
-See [Mobile app](#mobile-app) below for details.
+**Heads-up on both phone versions:** the app wraps the fantrax.com
+website (not the official Fantrax app) and injects the same features
+into it, with touch equivalents where hover/drag don't exist -- tap a
+player for the stat tooltip, tap-and-hold then drag to swap. See
+[Mobile app](#mobile-app) below for details.
 
 ## What you get
 
@@ -152,13 +154,20 @@ to go back to Fantrax's normal list.
 
 - **Swapping.** Drag a player onto another, or click a player and
   choose "Start Swap" from its menu, then click a legal target. Only
-  legal targets (same position, opposite active/bench side, not
-  locked) light up while a swap is in progress -- everything else
-  dims and stops accepting clicks/drops, and empty slots (invisible
-  the rest of the time) only appear where the player you're moving
-  could actually land. Players whose game has already started or
-  finished can't be moved, since Fantrax won't let you move them
-  anyway.
+  legal targets light up while a swap is in progress -- everything
+  else dims and stops accepting clicks/drops, and empty slots
+  (invisible the rest of the time) only appear where the player
+  you're moving could actually land. Eligibility uses each player's
+  FULL position list (a "D,M" player can be dropped on either a D or
+  an M), and a bench player can even replace an active player of a
+  position they don't play, as long as the formation has room for
+  them at their own position -- e.g. dragging a bench defender onto a
+  forward benches the forward and brings the defender on at D
+  (3-5-2 becomes 4-5-1). Both cards show a small spinner while the
+  swap executes. Players whose game has already started or finished
+  can't be moved, since Fantrax won't let you move them anyway.
+  Swaps only ever *stage* changes -- nothing is final until you press
+  Fantrax's own **Submit** button, exactly like using their list.
 - **Status dots.** Each name shows Fantrax's own real-life "is this
   player playing" indicator when one exists (green = confirmed
   starting, orange = expected to play, amber = expected on the real
@@ -167,6 +176,11 @@ to go back to Fantrax's normal list.
 - **Hover a player** to see how they got their points -- a breakdown
   by scoring stat (goals, tackles, clean sheet, etc.) for the
   gameweek -- or, if they haven't played yet, their projected points.
+  Switching to a future gameweek shows projections for everyone.
+- **Loading states instead of flicker.** While the first background
+  stat sync for a gameweek runs, the pitch shows a spinner and
+  skeleton cards rather than rendering numbers that immediately
+  change; later background refreshes update in a single pass.
 - **Click a player** for a small action menu: Start Swap, Trade,
   Drop, and View Player Card. The last three just click the
   equivalent real control already sitting in that player's (hidden)
@@ -174,19 +188,16 @@ to go back to Fantrax's normal list.
   player-card modal (Stats, Splits, News, Watch List, Compare, Notes)
   open exactly as they would from the real list.
 
-**Please read before relying on the swap feature:** it's done by
-clicking Fantrax's own real lineup button for each player (there's
-no public API for this), in the sequence that seemed most plausible
-from inspecting the page. I was not able to fully verify a real
-swap end-to-end while building this -- every same-position pair of
-not-yet-started players was unavailable at the time (bench/starters
-were either mismatched positions or already locked). Every attempt
-is verified afterward by re-reading the list, so it will tell you
-plainly ("that didn't go through") rather than pretend it worked --
-but the very first real swap you try is effectively the last piece
-of testing this needs. If it fails consistently, let me know exactly
-which two players and what the status message said, and I can adjust
-the click sequence.
+Swaps work by clicking Fantrax's own real lineup buttons (there's no
+public API for this), and every swap shape -- same-position,
+multi-position, and the two-step cross-position replacement -- has
+been verified end-to-end against the live site. Fantrax's own
+eligibility engine stays the authority throughout: arming a player
+makes Fantrax itself mark every illegal destination, and the
+extension refuses to click anything Fantrax has disabled. Every
+attempt is also verified afterward by re-reading the list, so a swap
+that doesn't take reports itself plainly instead of pretending it
+worked.
 
 ### Head-to-head matchup pitch (Live Scoring page)
 
@@ -200,7 +211,12 @@ collapses it whenever you'd rather have the plain tables.
 - **Hover (or tap, on touch screens) any player** for their stat
   breakdown -- the same hybrid lines as the tooltips below, e.g.
   "1 Assists (Total) (+6)", so you can see both what they did and what
-  it was worth.
+  it was worth. A tapped selection survives live-score re-renders.
+- **Each player's fixture** shows under their points (same treatment
+  as the roster pitch), and long text -- fixtures, names, team names
+  -- marquees back and forth instead of truncating.
+- **Team crests** appear next to each side's total score in the
+  matchup header.
 - **Responsive.** On a wide screen the pitch is horizontal (home left,
   away right); on a narrow one it rotates vertical (home top, away
   bottom) -- same information, phone-friendly shape.
@@ -226,13 +242,10 @@ back. That flip is fully masked -- the affected regions are hidden via
 CSS `visibility` while it happens -- so you never see the table
 flicker, and your chosen mode is never actually changed.
 
-### Fpts as the permanent default
-
-The live-scoring Stats/Fpts mode toggle is kept on Fpts automatically
--- on load, and whenever Fantrax would otherwise reset it (new
-gameweek, new matchup). If you manually click "Stats" yourself, the
-extension backs off for 10 minutes and leaves you alone in Stats view
-(it won't fight you).
+The Stats/Fpts mode toggle itself is never changed on your behalf --
+whichever mode you pick is the one you stay in. (An earlier version
+forced Fpts as the default; that caused visible mode-swapping on load
+and was removed.)
 
 ## Project layout
 
@@ -349,13 +362,22 @@ looked up once the page actually runs, not while the files are loading.
   underlying list; clicking either of Fantrax's own two options hides
   the pitch editor and restores their list, exactly like switching
   between two native tabs.
-- A swap is: click the source player's `lineup-btn`, wait, click the
-  target's `lineup-btn`, wait, then re-read the list to see if the
-  source's active/reserve status (or position) actually changed. If
-  Fantrax opens its own popup/menu partway through (this happens if
-  your account's "Lineup change system" setting is "Classic" instead
-  of "Easy Click"), the script backs off and lets you finish it there
-  rather than guessing which menu item to click.
+- A swap drives Fantrax's own two-click lineup flow: clicking a
+  player's `lineup-btn` "arms" them, at which point Fantrax itself
+  marks every invalid destination row `ineligible` and disables its
+  button -- the extension never re-derives those rules, it just
+  refuses to click a disabled button. For an active↔bench pair the
+  ACTIVE side is armed first (arming a multi-position bench player is
+  what makes Fantrax open its "Move / Change to <pos>" picker, so
+  that ordering is avoided wherever possible). A cross-position
+  replacement (bench D onto active F) has no single Fantrax op, so it
+  runs as two: bench player → empty active slot of a position they
+  play, then the displaced player → the bench spot that just freed
+  up. In the one shape where the picker is unavoidable, the extension
+  clicks its "Move" option itself and masks the whole overlay with
+  CSS while driving it, so it's never visible. Afterwards the list is
+  re-read and, for two-step swaps, BOTH players' new spots are
+  verified before success is reported.
 - The action menu's Trade/Drop/View Player Card items click the real
   `button.mat-gray--fill` (Trade), `button.mat-red--fill` (Drop), and
   `.scorer__info__name a` (player card) elements already present in
@@ -384,13 +406,13 @@ running inside the app's own WebView, not the official Fantrax app --
 that app can't be modified, so you open this one instead. You log into
 Fantrax inside the app once and the session persists after that.
 
-**Status: Phase 1.** The app shell is wired up and injects the scripts
-correctly, plus an on-screen diagnostic badge showing which page
-elements the features can actually find on the mobile layout. Fantrax's
-mobile site doesn't necessarily use the same class names/structure as
-desktop, so features built against the desktop selectors may not work
-yet until they're adapted (and touch support added where needed) --
-that's Phase 2.
+The features carry their own touch support (shared mechanics in
+`src/shared/touch-overlay.js`): tooltips open on tap, swaps run on
+tap-and-hold drag with a floating ghost card, and both pitches use
+responsive layouts at narrow widths. The bundle also includes an
+on-screen diagnostic badge (behind `window.FX_DIAGNOSTICS`) showing
+which page elements each feature found, for debugging layout
+differences on the mobile site.
 
 ### Build/run
 

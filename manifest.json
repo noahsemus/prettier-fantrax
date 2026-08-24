@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Prettier Fantrax",
-  "version": "0.0.1",
-  "description": "Small UX tweaks for Fantrax: stat tooltips + Fpts default in live scoring, and a drag-and-drop pitch editor for setting your lineup.",
+  "version": "0.1.0",
+  "description": "Makes Fantrax prettier: a drag-and-drop pitch editor for your lineup, a head-to-head matchup pitch for live scoring, and stat tooltips that explain every number.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

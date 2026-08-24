@@ -164,12 +164,22 @@
   }
 
   // Fantrax also nags with its OWN "Unsaved Changes" dialog (buttons read
-  // "arrow_backLeave" / "redoStay", icon ligature glued on) on an idle timer
-  // whenever a lineup change is pending -- completely unrelated to swap
-  // mechanics, but it lands in the same `.cdk-overlay-container` we watch
-  // for the real "Move" menu, and it was live-observed popping up mid
-  // multi-step sequence purely from elapsed time. Dismiss it (Stay -- we're
-  // not navigating) before treating a grown overlay as a real picker.
+  // "arrow_backLeave" / "redoStay", icon ligature glued on) whenever a
+  // lineup change is pending -- completely unrelated to swap mechanics, but
+  // it lands in the same `.cdk-overlay-container` we watch for the real
+  // "Move" menu. Root cause (found later, chasing a report that it kept
+  // appearing during a run of several swaps): it's not a generic idle
+  // timer -- points-sync.js's background scrape flips the real Fantasy
+  // Points/Stats tabs (and opens the period `mat-select`) roughly every
+  // 60s, both of which are real Angular route/query-param navigations, so
+  // either one trips this exact guard while a change is pending. That file
+  // now checks FXP.hasPendingLineupChanges() and skips its whole scrape
+  // whenever one is, so in normal use this collision shouldn't happen
+  // anymore -- state.busy also already blocks it for the full duration of
+  // any swap this function itself is running. Dismissal stays here as a
+  // safety net (e.g. a change left pending between two separate swaps,
+  // right as a new one starts, before that guard has had a chance to back
+  // the scrape off) -- Stay, since we're not navigating.
   function dismissUnsavedChangesNag() {
     const overlay = document.querySelector('.cdk-overlay-container');
     if (!overlay) return false;
