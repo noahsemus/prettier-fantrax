@@ -140,6 +140,8 @@ player for the stat tooltip, tap-and-hold then drag to swap. See
 
 ### Drag-and-drop pitch editor (Team Roster page)
 
+![The drag-and-drop pitch editor on the Team Roster page](screenshots/pitch-editor.png)
+
 Fantrax's roster page shows your squad as a long table, with a small
 read-only pitch graphic off to the side. This feature replaces that
 with a full interactive pitch: your complete squad (starting XI +
@@ -201,6 +203,8 @@ worked.
 
 ### Head-to-head matchup pitch (Live Scoring page)
 
+![The head-to-head matchup pitch on the Live Scoring page](screenshots/matchup-pitch.png)
+
 On a matchup's live-scoring page, this inserts a full-pitch view of the
 whole head-to-head above Fantrax's own scoring tables: both starting
 lineups facing each other (each team's goalkeeper at their own end),
@@ -225,6 +229,8 @@ collapses it whenever you'd rather have the plain tables.
   different head-to-head.
 
 ### Stat tooltips that actually explain the number
+
+<img src="screenshots/stat-tooltip.png" alt="Hovering a player shows their full stat breakdown with points per stat" width="500">
 
 In live scoring's Simple/Standard view, each player's line shows bare
 abbreviations like "KP 2" or "TkW 3". Hovering one now shows a tooltip
