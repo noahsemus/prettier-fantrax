@@ -26,11 +26,23 @@
     'scorer-icon--NOT_IN_UPCOMING_EVENT': 'out',
   };
 
+  // Wording for 'starting'/'bench' is Fantrax's OWN tooltip text, read live
+  // off their real mat-tooltip elements (not guessed, not our own hedged
+  // paraphrase) -- see the recon doc for the exact technique and readings.
+  // Notably neither hedges with "expected"/"confirmed" the way our old
+  // copy did (e.g. old bench label was literally "Expected to be on the
+  // bench" -- that "Expected" was our invention, not Fantrax's, and was
+  // the user's exact complaint). 'expected'/'out' have no live-confirmed
+  // example (no player with either class was found on any roster/matchup/
+  // gameweek reachable this session) -- kept as best-effort, deliberately
+  // non-hedged wording justified from the class name alone rather than
+  // silently inventing hedged language; update these two for real the
+  // moment a live example turns up.
   const EVENT_STATUS_LABEL = {
-    starting: 'Confirmed starting',
-    expected: 'Expected to play',
-    bench: 'Expected to be on the bench',
-    out: 'Not expected to play',
+    starting: 'Starting in upcoming/current game', // live-confirmed
+    expected: 'Likely to play', // best-effort, unconfirmed
+    bench: 'On the bench, potential substitute', // live-confirmed
+    out: 'Not in the squad for this game', // best-effort, unconfirmed
   };
 
   function readEventStatus(row) {

@@ -34,18 +34,23 @@
   // "<mark>Gameweek</mark>54<i>.75</i>" (label + whole-number text node +
   // decimal in its own <i>) -- strip the label and collapse whitespace to
   // get back a plain "54.75". `.scoring-header__score-secondary` is a
-  // plain "62.27" with no such split.
+  // plain "62.27" with no such split. `figure.scoring-header__logo` is the
+  // team crest, painted as a CSS background-image exactly like a player's
+  // `figure.scorer__image` -- same readCrestFromFigure helper, different
+  // figure (see dot-tooltip-recon.md's "Team header logo" section).
   function parseHeader(headerEl) {
     if (!headerEl) return null;
     const nameA = headerEl.querySelector('.scoring-header__name a');
     const primaryH2 = headerEl.querySelector('.scoring-header__score-primary h2');
     const secondaryEl = headerEl.querySelector('.scoring-header__score-secondary');
+    const logo = readCrestFromFigure(headerEl.querySelector('figure.scoring-header__logo'));
     const live = primaryH2
       ? primaryH2.textContent.replace(/Gameweek/i, '').replace(/\s+/g, '').trim()
       : '';
     const projected = secondaryEl ? secondaryEl.textContent.trim() : '';
     return {
       name: nameA ? nameA.textContent.trim() : '',
+      logo,
       live,
       projected,
     };

@@ -300,11 +300,23 @@
   // finished simply has no `.scorer-icon` and no eventStatus, and
   // renderCard below shows no dot at all for them -- see matchup.css's
   // .fxm-card__dot comment for the exact "why".
+  // 'starting'/'bench' wording is Fantrax's OWN tooltip text, read live off
+  // their real mat-tooltip elements (not guessed) -- see the recon doc for
+  // the exact technique and readings. Neither hedges with "expected"/
+  // "confirmed" the way our old copy did (old bench label was literally
+  // "Expected to be on the bench" -- that "Expected" was our invention,
+  // not Fantrax's, and was the exact wording the user objected to).
+  // 'expected'/'out' have no live-confirmed example (no player with either
+  // class was found on any roster/matchup/gameweek reachable this
+  // session) -- kept as best-effort, deliberately non-hedged wording
+  // justified from the class name alone rather than silently inventing
+  // hedged language; update these two for real the moment a live example
+  // turns up.
   const EVENT_STATUS_LABEL = {
-    starting: 'Confirmed starting',
-    expected: 'Expected to play',
-    bench: 'Expected to be on the bench',
-    out: 'Not expected to play',
+    starting: 'Starting in upcoming/current game', // live-confirmed
+    expected: 'Likely to play', // best-effort, unconfirmed
+    bench: 'On the bench, potential substitute', // live-confirmed
+    out: 'Not in the squad for this game', // best-effort, unconfirmed
   };
 
   // Mode pill lookup (Stats/Fpts), same "Mode" pill-group content.js reads
@@ -691,6 +703,36 @@
   }
 
   function applyNameMarquee(root) {
+    // Stale-pass guard -- fixes a real race where the ping-pong marquee
+    // appeared to "just reset" instead of resuming mid-cycle. render()
+    // schedules this via requestAnimationFrame(() => applyNameMarquee(body))
+    // AFTER building a fresh `body`, but that scheduling is async -- if a
+    // SECOND render() runs before the first render's rAF callback fires
+    // (this page's MutationObserver in main.js can trigger back-to-back
+    // renders well inside a single 6s marquee cycle), render() synchronously
+    // does `state.bodyEl.remove()` on the OLD body before attaching the new
+    // one. The OLDER rAF callback then fires with a `root` that is already
+    // detached from the document. Every element's scrollWidth/clientWidth
+    // measure as 0 on a detached node, so `overflow <= 0` is true for
+    // everything and applyMarqueeToSet's `overflowing` loop below never
+    // touches ANY key -- but this function still unconditionally did
+    // `state.marqueeStarts = nextStarts` at the end, stomping the real map
+    // with that (near-)empty one. The very next genuine (attached, correctly
+    // measuring) pass then finds no prior start time for a still-overflowing
+    // element's key, falls back to `now`, and its animation-delay resets to
+    // 0 -- reading to the user as "it just reset" even though the underlying
+    // ping-pong/persistence mechanism is otherwise correct.
+    //
+    // Fix: bail out here, before touching state.marqueeStarts at all, when
+    // `root` is no longer attached. render() always removes the previous
+    // body SYNCHRONOUSLY before scheduling the next rAF, so by the time a
+    // stale callback's rAF actually fires, its captured root is reliably
+    // already detached -- regardless of which order the two rAF callbacks
+    // end up firing in. A simple isConnected check is enough; no generation
+    // counter/token needed since detachment itself is the exact, reliable
+    // signal of staleness here.
+    if (!root.isConnected) return;
+
     // Defensive init here (not state.js) -- this codebase's convention for
     // a map that's only ever read/written by the one file that needs it;
     // state.js's FXM.state gets replaced wholesale on reload/re-eval, so a
@@ -735,13 +777,36 @@
   // richer side:isBench:name shape marqueeKey builds for player cards.
   function renderTeamHeader(side, extraClass, key) {
     const header = el('div', `fxm-team-header ${extraClass}`);
+    // Name row: team crest (when present) beside the team name -- see
+    // matchup.css's `.fxm-team-header__top` for how this row itself gets
+    // mirrored (logo-then-name vs. name-then-logo) between the home/away
+    // sides. `top` is its own wrapper (not just appending logo/name
+    // straight to `header`) so it can be a flex row independent of
+    // `header`'s own flex-column stacking of [name row] above [scores].
+    const top = el('div', 'fxm-team-header__top');
+    // Team crest, read straight off Fantrax's own header DOM (parse.js's
+    // parseHeader -> readCrestFromFigure on figure.scoring-header__logo --
+    // see dot-tooltip-recon.md's "Team header logo" section). Unlike
+    // jerseyFromCrest's CONSTRUCTED jersey URLs elsewhere in this file,
+    // this URL comes straight off the DOM (never guessed/constructed), so
+    // a broken image is very unlikely -- simplest safe handling is to just
+    // skip rendering the <img> entirely when there's no logo, rather than
+    // showing a broken-image icon.
+    if (side.header.logo) {
+      const logo = el('img', 'fxm-team-header__logo');
+      logo.src = side.header.logo;
+      logo.alt = '';
+      logo.draggable = false;
+      top.appendChild(logo);
+    }
     const nameEl = el('div', 'fxm-team-header__name');
     nameEl.dataset.marqueeKey = `header:${key}`;
     // Name text lives in an inner span, mirroring .fxm-card__name-text --
     // see applyNameMarquee/applyMarqueeToSet, which measures/animates this
     // exactly like a player card's name.
     nameEl.appendChild(el('span', 'fxm-team-header__name-text', side.header.name || ''));
-    header.appendChild(nameEl);
+    top.appendChild(nameEl);
+    header.appendChild(top);
     const scores = el('div', 'fxm-team-header__scores');
     scores.appendChild(el('span', 'fxm-team-header__live', side.header.live || '-'));
     scores.appendChild(el('span', 'fxm-team-header__projected', `proj ${side.header.projected || '-'}`));

@@ -111,6 +111,51 @@
   text-align: right;
 }
 
+/* Name row: crest + team name side by side. Its own flex row (not just
+   `.fxm-team-header` itself, which stays a flex COLUMN stacking this row
+   above `.fxm-team-header__scores`) so it can be independently reversed per
+   side below. min-width: 0 lets `.fxm-team-header__name` actually shrink
+   (and marquee) inside this flex row instead of forcing the row wider. */
+.fxm-team-header__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Away side is right-aligned (see `.fxm-team-header--away` above) -- mirror
+   the crest to the OUTER (right) edge of the name instead of always
+   sitting to the name's left, so the row reads as a coherent unit flush
+   against the header's own right-aligned edge. */
+.fxm-team-header--away .fxm-team-header__top {
+  flex-direction: row-reverse;
+}
+
+/* Modest, fixed size -- this is a compact header row, not a player card;
+   crest comes straight off Fantrax's own DOM (parse.js's readCrestFromFigure
+   on figure.scoring-header__logo) so it's never stretched/distorted here.
+   flex: 0 0 auto keeps it from ever being squeezed by the name's marquee
+   sizing next to it.
+   object-fit: cover + border-radius match Fantrax's OWN real rendering of
+   this exact crest, live-checked on Fantrax's own page:
+   figure.scoring-header__logo there computes to background-size: cover
+   (crops to fill, never letterboxes) with border-radius: 12px at their own
+   ~62px size -- i.e. a ratio of roughly width/5. `contain` (the old value)
+   letterboxed the image instead of cropping it, and had no rounding at all,
+   so it read visibly differently from Fantrax's own crest chip elsewhere on
+   the same page. border-radius: 6px here keeps that same ~width/5 ratio at
+   this element's own 30px base size (mobile scales both together -- see the
+   narrow-breakpoint override below). */
+.fxm-team-header__logo {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 6px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+
 /* text-overflow is `clip`, never `ellipsis`, exactly per .fxm-card__name's
    own comment below: a name that fits never truncates at all, so an
    "ellipsis for the fits case" rule is both pointless and risky -- it can
@@ -120,8 +165,20 @@
    could flash as a bare "..." with nothing else visible. `max-width` here
    is only the OVERFLOW TRIGGER boundary applyMarqueeToSet reads
    (scrollWidth vs. clientWidth) -- not a hard clip; a too-long team name
-   marquees instead of truncating, same treatment as player card names. */
+   marquees instead of truncating, same treatment as player card names.
+   min-width: 0 is required now that this sits in `.fxm-team-header__top`'s
+   flex row (next to the optional crest) -- without it, a flex item's
+   default auto min-width would refuse to shrink below its content size,
+   defeating both the max-width clamp and the overflow-driven marquee.
+   Same reasoning holds at the narrow breakpoint below, where
+   `.fxm-team-header__top` becomes `display: contents` and this element is
+   promoted to a direct grid item of `.fxm-team-header` (grid-area: name) --
+   a grid item's default auto min-width refuses to shrink below its content
+   size for exactly the same reason a flex item's does, so this same
+   min-width: 0 (already unconditional, not scoped to the flex case) keeps
+   doing the same job there with no separate override needed. */
 .fxm-team-header__name {
+  min-width: 0;
   font-weight: 700;
   font-size: 13px;
   max-width: 240px;
@@ -878,6 +935,83 @@
       "field"
       "away-bench"
       "away-header";
+  }
+
+  /* Crest as a full-height LEFT column beside name+live+projected, not just
+     beside the name -- the wide layout's `.fxm-team-header__top` (crest+name
+     row) stacked ABOVE `.fxm-team-header__scores` (live+projected column)
+     inside `.fxm-team-header`'s flex-column reads fine side-by-side with
+     the opposing team's header, but at this breakpoint the header block is
+     the ONLY thing next to its own half of the (now vertical) field, so the
+     crest is promoted to a proper avatar spanning the whole block instead
+     of a small mark that only sits next to the name.
+     `.fxm-team-header__top` is switched to `display: contents` so it
+     dissolves out of the layout -- its two children (`__logo`, `__name`)
+     become direct grid items of `.fxm-team-header` itself, independently
+     placeable by the grid-template-areas below, WITHOUT any DOM change in
+     render.js (that wrapper still exists in the markup and still does its
+     wide-layout flex-row job above this breakpoint; see render.js's
+     renderTeamHeader). `align-items: center` keeps the logo vertically
+     centered against the name+scores column rather than pinned to its top
+     edge. */
+  .fxm-team-header {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "logo name"
+      "logo scores";
+    column-gap: 10px;
+    align-items: center;
+  }
+
+  .fxm-team-header__top {
+    display: contents;
+  }
+
+  .fxm-team-header__logo {
+    grid-area: logo;
+    align-self: center;
+    /* Bigger than the 30px wide-layout base -- at this breakpoint the crest
+       is the visual anchor for three stacked lines of text (name, hero live
+       total, projected) rather than a small mark beside just the name, so it
+       needs to read as a proper avatar. Sized to look proportionate next to
+       the 34px live-total number without competing with it for attention.
+       border-radius scaled to the same ~width/5 ratio as the base rule
+       above (Fantrax's own live-measured ratio), 46 / 5 ≈ 9. */
+    width: 46px;
+    height: 46px;
+    border-radius: 9px;
+  }
+
+  .fxm-team-header__name {
+    grid-area: name;
+  }
+
+  .fxm-team-header__scores {
+    grid-area: scores;
+    /* The 4px base margin-top (see the base `.fxm-team-header__scores` rule)
+       existed to separate it from `.fxm-team-header__top` when the two sat
+       stacked in normal flex-column flow. At this breakpoint `scores` is its
+       own grid row instead, immediately under `name`'s row with no
+       intervening flow content -- that base margin would now just add
+       uneven extra gap under the name specifically (not under the logo,
+       which spans both rows), so it's zeroed out here. */
+    margin-top: 0;
+  }
+
+  /* Crest is ALWAYS on the left at this breakpoint, home and away alike --
+     unlike the wide layout, where home/away sit side-by-side and are
+     mirrored (crest at the outer edge) so the two headers face each other,
+     here the two headers stack top/bottom around the (now vertical) field
+     and there's no "facing" pair to mirror for any more. Cancels the wide
+     layout's away-side mirroring: `flex-direction: row-reverse` (only
+     relevant if `.fxm-team-header__top` weren't already `display: contents`
+     here -- kept for clarity/safety in case that ever changes) and the
+     `align-items: flex-end` / `text-align: right` inherited from the base
+     `.fxm-team-header--away` rule above (which itself exists purely for the
+     wide side-by-side mirroring and is equally inapplicable here). */
+  .fxm-team-header--away .fxm-team-header__top {
+    flex-direction: row;
   }
 
   .fxm-team-header--away {
