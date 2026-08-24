@@ -14,9 +14,9 @@
  *    a <span class="fx-tooltip__pts--pos|neg|zero"> built with
  *    createElement/createTextNode -- see showTooltip(). This is a
  *    self-contained rendering path with its own classes in content.css,
- *    distinct from (and not reusing) pitch-editor/tooltip.js's tooltip,
- *    since this content script may run before pitch-editor's scripts have
- *    populated window.FXP.
+ *    distinct from (and not reusing) pitch-editor/tooltip.js's or
+ *    matchup/render.js's tooltips, since this content script may run
+ *    before FXP/FXShared have populated window.FXP/window.FXShared.
  *    Because each mode only renders one of those two numbers at a time,
  *    this script periodically (throttled to every 30s, and only when
  *    the number of distinct players on screen changes or the throttle
@@ -27,18 +27,37 @@
  *    this script only ever visits the other mode for a moment to read
  *    it, then restores the original.
  *
- * 3) Snapshot caches are keyed by player name, not row position: on the
+ * 3) That flip used to be genuinely VISIBLE -- the mode pill and the
+ *    scoring table's values would visibly swap for a moment, most
+ *    jarringly right on page load -- so it was removed entirely for one
+ *    session. It's back, but now MASKED: while the flip-and-restore
+ *    sequence is running, `fx-livescoring-syncing` is added to
+ *    <html> and content.css hides (via `visibility: hidden`, never
+ *    `display: none`, so nothing reflows) the mode pill-group and the
+ *    scoring table's content -- the two regions that actually change
+ *    value during the flip. The class comes off again once the sequence
+ *    fully completes, success or failure. This is the exact same
+ *    technique -- mask a programmatic UI flip with CSS visibility so the
+ *    user never sees it -- that src/pitch-editor/points-sync.js already
+ *    uses for its own analogous scrape (its `ensureSyncStyle`/
+ *    `fx-syncing` class hides the roster page's Stats/Fantasy Points tab
+ *    flip and period-dropdown overlay); this file is the live-scoring
+ *    page's counterpart to that mechanism.
+ *
+ * 4) Snapshot caches are keyed by player name, not row position: on the
  *    matchup view a single ".scoring-table__row" holds TWO players (a
  *    home cell and an away cell side by side), so indexing by row would
  *    mix their stats together. Each stat chip's owning player is
  *    resolved via its ".scoring-table__cell" (falling back to the row)
  *    and its ".scorer__info__name a" text.
  *
- * 4) After each successful snapshot, the caches are published to
- *    window.FXC = { raw, fpts, capturedAt } for src/matchup/* to read
- *    (read-only; may be undefined before the first capture). This is
- *    the same cross-file-global mechanism as window.FXP/FX_STAT_NAMES,
- *    since content scripts of one extension share the isolated world.
+ * 5) After each successful snapshot, the caches are published to
+ *    window.FXC = { raw, fpts, capturedAt } for src/matchup/render.js to
+ *    read as an ENHANCEMENT layer on top of its own always-available
+ *    per-chip fallback (read-only; may be undefined before the first
+ *    capture). This is the same cross-file-global mechanism as
+ *    window.FXP/FX_STAT_NAMES, since content scripts of one extension
+ *    share the isolated world.
  * ---------------------------------------------------------------------
  */
 (function () {
@@ -48,6 +67,7 @@
   const ABBR_MAP = window.FX_STAT_NAMES;
 
   const THROTTLE_MS = 30000; // don't re-snapshot the counterpart mode more than every 30s
+  const MASK_CLASS = 'fx-livescoring-syncing'; // see content.css; masks the flip below
 
   const state = {
     isToggling: false,
@@ -159,7 +179,8 @@
   // Whatever mode is currently active, capture it, briefly flip to the
   // OTHER mode and capture that too, then flip back to the original mode.
   // Only runs when actually needed (player count changed, or the throttle
-  // window elapsed) -- never on every mutation.
+  // window elapsed) -- never on every mutation. The flip itself is masked
+  // (see the header comment, point 3) so it's never visible to the user.
   async function snapshotCounterpart() {
     if (state.isToggling) return;
     const buttons = getModeButtons();
@@ -182,11 +203,17 @@
     const originalBtn = onStats ? stats : fpts;
     const otherBtn = onStats ? fpts : stats;
     try {
-      // Capture whichever view is live right now.
+      // Capture whichever view is live right now -- no click involved, so
+      // nothing to mask for this read.
       captureCache(onStats ? 'rawCache' : 'fptsCache');
 
       // Flip to the counterpart mode, capture it, then always flip back --
-      // even if capturing throws -- so the user's mode is never left changed.
+      // even if capturing throws -- so the user's mode is never left
+      // changed. Masked for the whole flip-and-restore-back sequence (mask
+      // added right before the first click, removed in `finally` once the
+      // sequence fully completes) so the pill/table swap the user would
+      // otherwise see never actually paints.
+      document.documentElement.classList.add(MASK_CLASS);
       try {
         otherBtn.click();
         await waitForNextRender();
@@ -196,6 +223,7 @@
           originalBtn.click();
           await waitForNextRender();
         }
+        document.documentElement.classList.remove(MASK_CLASS);
       }
 
       state.lastNameCount = nameCount;

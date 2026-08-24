@@ -106,7 +106,33 @@
     const chips = parseChips(cell);
     const gameA = cell.querySelector('.scoring-table__cell__content ul a');
     const gameText = gameA ? gameA.textContent.replace(/\s+/g, ' ').trim() : '';
-    return { name: nameA.textContent.trim(), pos, crest, points, chips, gameText };
+    const eventStatus = readEventStatus(cell);
+    return { name: nameA.textContent.trim(), pos, crest, points, chips, gameText, eventStatus };
+  }
+
+  // Fantrax's own real-life "is this player playing" indicator (a colored
+  // dot next to their name), read the exact same way
+  // pitch-editor/roster.js's readEventStatus does -- see EVENT_STATUS_MAP
+  // there. Duplicated (not imported) for the same stand-alone-module reason
+  // as readCrestFromFigure above: this module must work regardless of
+  // script load order between the pitch-editor and matchup features. Only
+  // present pre-kickoff; there's nothing to show once a player's game has
+  // started or finished, which is exactly why render.js shows no dot at
+  // all when this comes back null.
+  const EVENT_STATUS_MAP = {
+    'scorer-icon--IN_UPCOMING_EVENT': 'starting',
+    'scorer-icon--IN_UPCOMING_EVENT_EXPECTED': 'expected',
+    'scorer-icon--BENCH_UPCOMING_EVENT': 'bench',
+    'scorer-icon--NOT_IN_UPCOMING_EVENT': 'out',
+  };
+
+  function readEventStatus(cell) {
+    for (const icon of qa('.scorer-icon', cell)) {
+      for (const cls of icon.classList) {
+        if (EVENT_STATUS_MAP[cls]) return EVENT_STATUS_MAP[cls];
+      }
+    }
+    return null;
   }
 
   const VALID_POS_LABELS = { G: true, D: true, M: true, F: true, Res: true };

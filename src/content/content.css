@@ -42,3 +42,19 @@
   cursor: help;
   border-bottom: 1px dotted rgba(255, 255, 255, 0.35);
 }
+
+/* Masks content.js's brief, programmatic Stats/Fpts pill flip
+   (snapshotCounterpart) used to read the OTHER mode's values -- the same
+   "hide the flip with visibility:hidden, not display:none, so nothing
+   reflows" technique src/pitch-editor/points-sync.js's ensureSyncStyle /
+   `fx-syncing` class already uses for its own analogous scrape-by-
+   flipping-real-UI-controls on the roster page. `visibility: hidden`
+   (never `display: none`) keeps every element's layout box exactly where
+   it was, so hiding/revealing it causes no reflow or size jump -- only
+   the mode pill-group and the scoring table's own content (the two
+   regions that actually change value between modes) are covered; nothing
+   else on the page is touched. */
+html.fx-livescoring-syncing pill-group[aria-label="Mode"],
+html.fx-livescoring-syncing .scoring-table {
+  visibility: hidden;
+}

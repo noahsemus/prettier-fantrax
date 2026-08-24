@@ -64,13 +64,15 @@
 }
 
 /* ---------- body layout + team headers ---------- */
-/* .fxm-body is a CSS grid so each team header can be its own top-level grid
-   item (not nested in a shared "header bar" wrapper) and get repositioned
-   purely by which named area matchup.css assigns it at each breakpoint --
-   wide: both headers share one row above the field (visually the old
-   single header bar). Narrow: home's header sits above the field next to
-   home's half, away's header sits below the field, next to away's bench --
-   see the `@media (max-width: 760px)` override below for the split. */
+/* .fxm-body is a CSS grid so each team header AND each team's bench strip
+   can be its own top-level grid item (neither nested in a shared "header
+   bar"/"bench bar" wrapper) and get repositioned purely by which named
+   area matchup.css assigns it at each breakpoint -- wide: both headers
+   share one row above the field and both benches share one row below it
+   (visually the old single header bar / single bench bar). Narrow: home's
+   header+bench sit above the field next to home's half, away's
+   header+bench sit below the field next to away's half -- see the
+   `@media (max-width: 760px)` override below for the split. */
 .fxm-body {
   display: grid;
   /* minmax(0, 1fr), not plain 1fr -- a bare `1fr` track still has an
@@ -87,7 +89,7 @@
   grid-template-areas:
     "home-header away-header"
     "field field"
-    "bench bench";
+    "home-bench away-bench";
 }
 
 .fxm-team-header {
@@ -109,13 +111,55 @@
   text-align: right;
 }
 
+/* text-overflow is `clip`, never `ellipsis`, exactly per .fxm-card__name's
+   own comment below: a name that fits never truncates at all, so an
+   "ellipsis for the fits case" rule is both pointless and risky -- it can
+   only ever fire during the timing gap before render.js's
+   applyNameMarquee/applyMarqueeToSet measurement pass runs (fresh DOM,
+   animation not yet applied), which is exactly how a real overflowing name
+   could flash as a bare "..." with nothing else visible. `max-width` here
+   is only the OVERFLOW TRIGGER boundary applyMarqueeToSet reads
+   (scrollWidth vs. clientWidth) -- not a hard clip; a too-long team name
+   marquees instead of truncating, same treatment as player card names. */
 .fxm-team-header__name {
   font-weight: 700;
   font-size: 13px;
   max-width: 240px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
+}
+
+.fxm-team-header__name-text {
+  display: inline-block;
+}
+
+/* Applied by render.js's applyNameMarquee/applyMarqueeToSet only when the
+   name actually overflows its box -- mirrors .fxm-card__name--marquee's
+   own comment below, adapted for a header name that can be either
+   naturally left-aligned (home side, inherited default) or right-aligned
+   (away side, via .fxm-team-header--away's own `text-align: right` above,
+   which otherwise inherits straight down onto this element).
+   .fxm-team-header__name-text is display: inline-block, so its resting
+   (0%) static position sits wherever the CURRENT text-align puts it --
+   on the away side that's flush right, i.e. 0% would already show the
+   TAIL of the name with the start clipped off, and the translateX(0) ->
+   translateX(var(--fxm-marquee-dist)) range (computed by
+   applyMarqueeToSet as the exact scrollWidth - clientWidth overflow)
+   wouldn't line up with the text's true start/end either. Forcing
+   `text-align: left` here -- regardless of side -- makes the inner
+   span's static position flush with the box's left edge on BOTH sides
+   once marqueeing, so 0% always shows the real start of the name and the
+   animation's endpoint always shows the real end, exactly like
+   .fxm-card__name--marquee. Reuses the SAME `fxm-marquee` keyframes
+   player card names use (already parametrized entirely by
+   --fxm-marquee-dist, so nothing side-specific needs duplicating here). */
+.fxm-team-header__name--marquee {
+  text-align: left;
+}
+
+.fxm-team-header__name--marquee .fxm-team-header__name-text {
+  animation: fxm-marquee 6s ease-in-out infinite alternate;
 }
 
 /* Hero totals: the LIVE score is the whole point of this header, so it
@@ -360,6 +404,27 @@
   flex-direction: column;
   align-items: center;
   cursor: default;
+  /* Smooths the dim/undim toggle below -- without this the opacity change
+     on tap-select is an instant snap rather than a fade. Harmless on
+     desktop, where .fxm-card--dimmed is never applied (see render.js's
+     setSelectedCard -- touch-tap-only by design). */
+  transition: opacity 0.2s ease;
+}
+
+/* Touch tap-to-select (render.js's setSelectedCard, wired only off the
+   touchend tap path in attachHoverTooltip -- never off desktop
+   mouseenter/mouseleave) -- dims every OTHER card on the pitch/bench so
+   the tapped player's tooltip is unambiguous about which card it belongs
+   to. `.fxm-card--selected` carries no styling of its own on purpose: the
+   tapped card simply never gets `--dimmed`, so it stays exactly as it
+   already looked -- the class exists as a hook (and to make the "who's
+   selected" state explicit in the DOM) rather than to add its own visual
+   treatment. Cleared everywhere hideTooltip() is, since that's the single
+   choke point every close path (toggle-close, tap-outside, stale-target
+   scroll-hide) already routes through.
+   */
+.fxm-card--dimmed {
+  opacity: 0.35;
 }
 
 .fxm-card__crest {
@@ -383,13 +448,21 @@
   margin-top: 2px;
 }
 
+/* text-overflow is `clip`, never `ellipsis`, in EITHER state below. A name
+   that fits never truncates at all, so an "ellipsis for the fits case"
+   rule is both pointless and risky -- it can only ever fire during a
+   timing gap before render.js's applyNameMarquee measurement pass runs
+   (fresh DOM, animation not yet applied), which is exactly how a real
+   overflowing name could flash as a bare "..." with nothing else visible.
+   `clip` is safe unconditionally: a fitting name never overflows its box
+   in the first place, so there's nothing to clip either way. */
 .fxm-card__name {
   font-size: 10px;
   color: #fff;
   text-align: center;
   line-height: 1.2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
@@ -399,12 +472,20 @@
 }
 
 /* Applied by render.js's applyNameMarquee only when the name actually
-   overflows its card -- a name that fits stays exactly as it was (plain
-   ellipsis-capable, non-animated). No ellipsis here: the whole point is
-   the full name stays readable, just scrolled into view over time instead
-   of cut off. */
+   overflows its card -- a name that fits stays exactly as it was
+   (centered, non-animated). text-align switches to `left` here on
+   purpose: .fxm-card__name-text is display:inline-block, so under the
+   base `text-align: center` above its resting (0%) position is already
+   centered within the box -- i.e. clipped by roughly half the overflow on
+   BOTH sides before the animation even starts, and the translateX(0) ->
+   translateX(var(--fxm-marquee-dist)) range (computed by applyNameMarquee
+   as the exact scrollWidth - clientWidth overflow) then no longer lines up
+   with the text's true start/end. `text-align: left` makes the inner
+   span's static position flush with the box's left edge, so 0% shows the
+   real start of the name and the animation's endpoint shows the real end
+   -- the full name, not a middle slice. */
 .fxm-card__name--marquee {
-  text-overflow: clip;
+  text-align: left;
 }
 
 .fxm-card__name--marquee .fxm-card__name-text {
@@ -422,36 +503,54 @@
   }
 }
 
-/* Game-state dot, rendered by render.js's renderCard just before the
-   (possibly marquee-animated) name-text span so it always stays static --
-   see gameDotInfo/marqueeKey in render.js. Deliberately its OWN color
-   palette, distinct from .fxm-card__pts's gold/red pos/neg colors just
-   below: those already mean "positive/negative points" on this same card,
-   so reusing green/red here for "game state" would read as a second,
-   conflicting points signal instead of "did they even play yet". */
+/* Pre-kickoff player status dot -- Fantrax's OWN real-life "is this player
+   playing" indicator (the colored dot next to a player's name on the
+   roster list, driven by their `.scorer-icon--*` class -- see
+   parse.js's readEventStatus / render.js's EVENT_STATUS_LABEL), not a
+   guess of our own. Colors are a literal copy of pitch-editor/card.css's
+   .fx-card__dot--* values, for palette consistency between the two
+   features. Only rendered when parse.js actually found a `.scorer-icon`
+   for this player -- that indicator only exists pre-kickoff on Fantrax's
+   page, so a player whose game has started or finished simply gets no dot
+   at all (see render.js's renderCard); there's no "finished"/"unknown"
+   dot color any more.
+   Pinned to the CARD's own bottom-left corner (`.fxm-card` above is
+   `position: relative`) rather than inline next to the name -- inline
+   was eating width from an already name-space-starved box (that's the
+   whole reason names marquee) and could shrink a long name down to
+   nothing visible. Sitting over .fxm-card__info's rounded bottom-left
+   corner (the dark plate is the card's last/bottom child) keeps it clear
+   of the jersey image above and, since points text is centered, clear of
+   .fxm-card__pts too; the dark ring (box-shadow) keeps it legible even at
+   the rounded corner's edge where a sliver of the green pitch can show
+   through. Inset (positive offsets, not negative) so the whole dot sits
+   inside the card's box instead of straddling its edge. */
 .fxm-card__dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  margin-right: 3px;
-  margin-bottom: 1px;
   box-sizing: border-box;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+  z-index: 2;
 }
 
-/* Finished: solid, neutral/light -- their number on the card is a real
-   (possibly zero) result. */
-.fxm-card__dot--finished {
-  background: #e7ecf2;
+.fxm-card__dot--starting {
+  background: hsl(160 84% 38%);
 }
 
-/* Upcoming: hollow -- their number on the card is a forced zero, not yet a
-   real result (see render.js's isUpcoming). Outlined rather than filled so
-   it reads as "empty/not started" at a glance, distinct from the solid
-   finished dot. */
-.fxm-card__dot--upcoming {
-  background: transparent;
-  border: 1.3px solid #9aa4b2;
+.fxm-card__dot--expected {
+  background: hsl(27 100% 61%);
+}
+
+.fxm-card__dot--bench {
+  background: hsl(46 97% 65%);
+}
+
+.fxm-card__dot--out {
+  background: hsl(349.7 80% 60.2%);
 }
 
 .fxm-card__pts {
@@ -471,6 +570,55 @@
 
 .fxm-card__pts--zero {
   color: #aeb8c4;
+}
+
+/* Game/opponent line (e.g. "MUN 0 @ HUL 2 F"), under the points --
+   mirrors pitch-editor/card.css's .fx-card__opp treatment (small, muted,
+   centered) for visual consistency between the two features. Own class,
+   own rule: the shared piece is FXShared.formatOpp's formatting LOGIC
+   (src/shared/touch-overlay.js), not this CSS -- each feature's card
+   component is still styled independently, matching .fxm-card__dot's
+   comment on why colors are a literal copy rather than a shared class.
+   text-overflow is `clip`, never `ellipsis`, for the exact same reason as
+   .fxm-card__name above: a line that fits never truncates in the first
+   place, so an "ellipsis for the fits case" rule is both pointless and
+   risky -- it can only ever fire during the timing gap before render.js's
+   applyMarqueeToSet measurement pass runs. A too-long game/opponent line
+   marquees instead of truncating, same treatment as player card names and
+   team header names, and reuses the SAME `fxm-marquee` keyframes (see
+   .fxm-card__name--marquee) rather than a duplicate declaration. */
+.fxm-card__opp {
+  font-size: 8.5px;
+  color: #cfe0ea;
+  opacity: 0.75;
+  text-align: center;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.fxm-card__opp-text {
+  display: inline-block;
+}
+
+/* Applied by render.js's applyMarqueeToSet only when the opp line actually
+   overflows its box -- text-align switches to `left` for the same reason
+   as .fxm-card__name--marquee's own comment above (the inner span's
+   resting 0% position must be flush with the box's true start, not its
+   centered default, for the translateX(0) -> translateX(var(
+   --fxm-marquee-dist)) range to line up with the text's real start/end). */
+.fxm-card__opp--marquee {
+  text-align: left;
+}
+
+.fxm-card__opp--marquee .fxm-card__opp-text {
+  animation: fxm-marquee 6s ease-in-out infinite alternate;
+}
+
+.fxm-card--bench .fxm-card__opp {
+  font-size: 7.5px;
 }
 
 /* ---------- hover breakdown tooltip ---------- */
@@ -516,39 +664,43 @@
 }
 
 /* Color-coded parenthetical signed-points suffix on a stat line, e.g. the
-   "(+6)" in "1 Assists (Total) (+6)" -- its own span (see render.js's
-   showTooltip) so it can carry a color independent of the row's text. */
-.fxm-tip__stat--pos {
-  color: #5be08a;
-}
-
-.fxm-tip__stat--neg {
-  color: #ff8a80;
-}
-
-.fxm-tip__stat--zero {
-  color: #9aa4b2;
-}
+   "(+6)" in "1 Assists (Total) (+6)" -- its own span, built by
+   FXShared.renderStatLine (src/shared/touch-overlay.js), classed
+   `fxs-stat-pts fxs-stat-pts--pos|neg|zero` and styled once in
+   src/shared/touch-overlay.css. Was `.fxm-tip__stat--*` here; removed in
+   favor of the shared classes (also used by pitch-editor's tooltip/action
+   menu) so the color values can't drift between the two features again. */
 
 /* ---------- bench strip ---------- */
-
-.fxm-bench-bar {
-  grid-area: bench;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+/* Each team's bench is its own top-level `.fxm-body` grid item now, not
+   nested inside a shared "bench bar" wrapper -- same restructuring as the
+   team headers above, and for the same reason: it's what lets the narrow
+   breakpoint move home's bench next to home's header/half and away's bench
+   next to away's, instead of the two benches always sitting together. See
+   the `@media (max-width: 760px)` override below for the split; wide
+   layout's "home-bench away-bench" area (in .fxm-body above) keeps them
+   side by side in one row, visually the old single bench bar. */
+.fxm-bench {
+  min-width: 0;
   background: #14181f;
   padding: 10px 14px 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.fxm-bench {
-  flex: 1;
-  min-width: 0;
+.fxm-bench--home {
+  grid-area: home-bench;
+  /* Small gap from away-bench sharing the same wide-layout row (there's no
+     grid gap between them -- see .fxm-body's own comment on why a grid gap
+     isn't used for the header row above; same reasoning applies here).
+     Reset back to the base 14px in the narrow media query below, where
+     each bench is full-width and no longer needs the extra separation. */
+  padding-right: 20px;
 }
 
 .fxm-bench--away {
+  grid-area: away-bench;
   text-align: right;
+  padding-left: 20px;
 }
 
 .fxm-bench__label {
@@ -594,7 +746,8 @@
 .fxm-card--bench .fxm-card__dot {
   width: 5px;
   height: 5px;
-  margin-right: 2px;
+  bottom: 2px;
+  left: 2px;
 }
 
 .fxm-card--bench .fxm-card__pts {
@@ -642,17 +795,21 @@
     flex-direction: row;
   }
 
-  /* Split the two team headers onto opposite sides of the field: home's
-     stays above (next to home's half), away's moves below (next to away's
-     bench) instead of stacking together above the field. Single column so
-     each header's area is now its own full-width grid row. */
+  /* Split each team's header AND bench onto its own side of the field:
+     home's header+bench stay above (next to home's half), away's
+     header+bench move below (next to away's half) instead of both headers
+     stacking together above the field and both benches stacking together
+     below it. Single column so each area is now its own full-width grid
+     row; bench sits between its own team's header and the field on each
+     side, mirrored top/bottom around the field. */
   .fxm-body {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       "home-header"
+      "home-bench"
       "field"
-      "away-header"
-      "bench";
+      "away-bench"
+      "away-header";
   }
 
   .fxm-team-header--away {
@@ -660,11 +817,16 @@
     text-align: left;
   }
 
-  .fxm-bench-bar {
-    flex-direction: column;
+  /* Each bench is full-width by itself at this breakpoint (no longer
+     sharing a row with the other team's bench) -- back to the base
+     symmetric padding instead of the wide layout's one-sided 20px used to
+     separate the two when they sit side by side. */
+  .fxm-bench--home {
+    padding-right: 14px;
   }
 
   .fxm-bench--away {
+    padding-left: 14px;
     text-align: left;
   }
 

@@ -1,0 +1,32 @@
+/**
+ * Fantrax Refinements -- shared touch-overlay module: color tokens
+ * ---------------------------------------------------------------------
+ * The ONE shared definition of the signed-points parenthetical color
+ * classes built by touch-overlay.js's FXShared.renderStatLine, consumed by
+ * both pitch-editor's tooltip/action-menu stat lines and matchup's
+ * tooltip stat lines. Replaces the formerly-duplicated `.fx-tip-pts--*`
+ * (pitch-editor/tooltip.css) and `.fxm-tip__stat--*` (matchup/matchup.css)
+ * rules.
+ *
+ * Values: green/red match what both duplicated rulesets already agreed on
+ * (#5be08a / #ff8a80). The muted "zero" gray had drifted slightly between
+ * the two (#aeb8c4 in fx-tip-pts--zero vs #9aa4b2 in fxm-tip__stat--zero)
+ * -- standardized here on #aeb8c4, which also matches the pts-color
+ * classes on the cards themselves in both features (.fx-card__fpts--zero,
+ * .fxm-card__pts--zero), so the "zero" gray now reads consistently
+ * everywhere a stat number appears, not just in the two former tooltip
+ * stylesheets.
+ * ---------------------------------------------------------------------
+ */
+
+.fxs-stat-pts--pos {
+  color: #5be08a;
+}
+
+.fxs-stat-pts--neg {
+  color: #ff8a80;
+}
+
+.fxs-stat-pts--zero {
+  color: #aeb8c4;
+}

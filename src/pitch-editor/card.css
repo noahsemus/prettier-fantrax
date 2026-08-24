@@ -66,6 +66,20 @@
   pointer-events: none;
 }
 
+/* Touch tap-select dimming -- action-menu.js's openActionMenu, via
+   FXShared.selectAndDim (src/shared/touch-overlay.js), dims every OTHER
+   card while the action menu is anchored to one on a coarse-pointer
+   (touch) device, so it's unambiguous which player the menu belongs to.
+   Cleared by closeActionMenu via FXShared.clearDim. Mirrors
+   matchup.css's `.fxm-card--dimmed` exactly (same opacity, same
+   transition) for visual consistency between the two features -- own
+   class name/own rule here rather than a shared CSS class, since each
+   feature's card component is styled independently. */
+.fx-card--dimmed {
+  opacity: 0.35;
+  transition: opacity 0.2s ease;
+}
+
 .fx-card__crest {
   width: auto;
   height: 46px;
@@ -211,10 +225,30 @@
   line-height: 1.25;
   max-width: 86px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
   pointer-events: none;
   margin-top: 2px;
+}
+
+/* Long game/opponent lines that don't fit in the 86px box marquee instead of
+   truncating -- same mechanism as .fx-card__name--marquee above (see that
+   comment and applyMarquee/MARQUEE_SETS in render.js), just applied to a
+   different element and reusing the SAME fx-marquee keyframes rather than a
+   duplicate declaration. text-overflow stays `clip` here too, avoiding
+   Safari/Firefox drawing an ellipsis over the animating text at the
+   extremes of its travel. */
+.fx-card__opp--marquee {
+  text-overflow: clip;
+}
+
+.fx-card__opp-inner {
+  display: inline-block;
+  will-change: transform;
+}
+
+.fx-card__opp--marquee .fx-card__opp-inner {
+  animation: fx-marquee 6s ease-in-out infinite alternate;
 }
 
 .fx-card__plus {

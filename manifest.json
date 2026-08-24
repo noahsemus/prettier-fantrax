@@ -19,6 +19,7 @@
       "matches": ["https://www.fantrax.com/*"],
       "js": [
         "src/shared/stat-names.js",
+        "src/shared/touch-overlay.js",
         "src/pitch-editor/state.js",
         "src/pitch-editor/roster.js",
         "src/pitch-editor/tabs.js",
@@ -31,6 +32,7 @@
         "src/pitch-editor/main.js"
       ],
       "css": [
+        "src/shared/touch-overlay.css",
         "src/pitch-editor/pitch.css",
         "src/pitch-editor/card.css",
         "src/pitch-editor/tooltip.css",
@@ -42,12 +44,13 @@
       "matches": ["https://www.fantrax.com/*"],
       "js": [
         "src/shared/stat-names.js",
+        "src/shared/touch-overlay.js",
         "src/matchup/state.js",
         "src/matchup/parse.js",
         "src/matchup/render.js",
         "src/matchup/main.js"
       ],
-      "css": ["src/matchup/matchup.css"],
+      "css": ["src/shared/touch-overlay.css", "src/matchup/matchup.css"],
       "run_at": "document_idle"
     }
   ]

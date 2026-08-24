@@ -11,6 +11,7 @@
   'use strict';
   const qa = FXP.qa;
   const state = FXP.state;
+  const FXShared = window.FXShared;
 
   // ---------- jersey images (borrowed from Fantrax's own read-only pitch widget) ----------
 
@@ -43,18 +44,6 @@
     const origin = m[1];
     if (pos === 'G') return `${origin}/assets/images/jerseys/epl/Premier-League-jersey-logo_goalkeeper.png`;
     return `${origin}/assets/images/jerseys/epl/Premier-League-jersey_${m[2]}.png`;
-  }
-
-  function formatOpp(oppText) {
-    if (!oppText) return '';
-    return oppText
-      .replace(/@/g, ' @ ')
-      .replace(/(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/g, ' $1')
-      .replace(/([A-Za-z]{2,4})(\d)/g, '$1 $2')
-      .replace(/(\d)(AM|PM)/gi, '$1 $2')
-      .replace(/(\d)(F)$/, '$1 $2')
-      .replace(/\s+/g, ' ')
-      .trim();
   }
 
   // ---------- pitch field markings (goal end + half center-circle) ----------
@@ -178,12 +167,15 @@
     applyMarquee(container);
   }
 
-  // ---------- marquee for long player names ----------
-  // Truncating with an ellipsis (the old .fx-card__name behavior) hides part
-  // of the name entirely; this instead lets names that overflow their fixed
-  // 84px box scroll slowly back and forth so the whole name is readable.
-  // Names that already fit are untouched -- no class/property gets added and
-  // .fx-card__name-inner just sits static like plain text always did.
+  // ---------- marquee for long player names + game/opponent text ----------
+  // Truncating with an ellipsis (the old .fx-card__name/.fx-card__opp
+  // behavior) hides part of the text entirely; this instead lets text that
+  // overflows its fixed box scroll slowly back and forth so the whole
+  // string is readable. Text that already fits is untouched -- no
+  // class/property gets added and the inner span just sits static like
+  // plain text always did. Originally name-only; now shared (via
+  // MARQUEE_SETS below) with the game/opponent line under a player's fpts
+  // (.fx-card__opp), for the exact same reason and mechanism.
   //
   // Reads (scrollWidth/clientWidth) and writes (class/style) are batched into
   // two separate passes over all cards so measuring one card's layout never
@@ -207,32 +199,47 @@
   // current 6s cycle we already are -- a negative delay tells the browser to
   // act as though the animation already ran that long, so a brand-new node
   // resumes mid-cycle instead of restarting at 0%.
+  // Element sets that get the marquee treatment, each with its own inner
+  // span selector + marquee class. `keyPrefix` namespaces the persisted
+  // state.marqueeStarts key derived from the card's own p.key
+  // (card.dataset.key) so the SAME card's name entry and opp-line entry can
+  // never collide -- mirrors matchup/render.js's 'opp:' prefix over its own
+  // marqueeKey scheme for the exact same reason.
+  const MARQUEE_SETS = [
+    { selector: '.fx-card__name', innerSelector: '.fx-card__name-inner', marqueeClass: 'fx-card__name--marquee', keyPrefix: '' },
+    { selector: '.fx-card__opp', innerSelector: '.fx-card__opp-inner', marqueeClass: 'fx-card__opp--marquee', keyPrefix: 'opp:' },
+  ];
+
   function applyMarquee(container) {
     // Defensive init (not part of state.js's shape) -- see comment above.
     state.marqueeStarts = state.marqueeStarts || new Map();
     requestAnimationFrame(() => {
-      const names = qa('.fx-card__name', container);
       const overflowing = [];
-      // Pass 1: measure only.
-      names.forEach((el) => {
-        const inner = el.querySelector('.fx-card__name-inner');
-        if (!inner) return;
-        const dist = inner.scrollWidth - el.clientWidth;
-        if (dist > 1) {
-          const card = el.closest('.fx-card');
-          const key = card && card.dataset.key;
-          overflowing.push({ el, inner, dist, key });
-        }
+      // Pass 1: measure only, across both element sets above (name AND
+      // opp/game-text line -- same mechanism, same rAF pass, so measuring
+      // one never gets invalidated by a style write made for the other).
+      MARQUEE_SETS.forEach(({ selector, innerSelector, marqueeClass, keyPrefix }) => {
+        qa(selector, container).forEach((el) => {
+          const inner = el.querySelector(innerSelector);
+          if (!inner) return;
+          const dist = inner.scrollWidth - el.clientWidth;
+          if (dist > 1) {
+            const card = el.closest('.fx-card');
+            const key = card && card.dataset.key ? `${keyPrefix}${card.dataset.key}` : null;
+            overflowing.push({ el, inner, dist, key, marqueeClass });
+          }
+        });
       });
       // Pass 2: write only.
       const now = Date.now();
       const cycleMs = 6000; // must match fx-marquee's animation-duration in card.css
       // Rebuild the map with only this render's marqueeing keys, carrying
-      // forward their existing start times -- drops players that are no
-      // longer present or no longer overflowing so it can't grow unbounded.
+      // forward their existing start times -- drops players (and opp lines)
+      // that are no longer present or no longer overflowing so it can't
+      // grow unbounded.
       const nextStarts = new Map();
-      overflowing.forEach(({ el, inner, dist, key }) => {
-        el.classList.add('fx-card__name--marquee');
+      overflowing.forEach(({ el, inner, dist, key, marqueeClass }) => {
+        el.classList.add(marqueeClass);
         el.style.setProperty('--fx-marquee-dist', `-${dist}px`);
         if (!key) return;
         const startTime = state.marqueeStarts.get(key) || now;
@@ -317,11 +324,19 @@
         info.appendChild(fpts);
       }
 
-      const opp = formatOpp(p.oppText);
+      const opp = FXShared.formatOpp(p.oppText);
       if (opp) {
         const oppEl = document.createElement('div');
         oppEl.className = 'fx-card__opp';
-        oppEl.textContent = opp;
+        // Text lives in an inner span, mirroring .fx-card__name-inner --
+        // see applyMarquee/MARQUEE_SETS, which measures/animates this
+        // exactly like a player card's name (own 'opp:'-prefixed
+        // state.marqueeStarts key so it can't collide with this same
+        // card's name entry).
+        const oppInner = document.createElement('span');
+        oppInner.className = 'fx-card__opp-inner';
+        oppInner.appendChild(document.createTextNode(opp));
+        oppEl.appendChild(oppInner);
         info.appendChild(oppEl);
       }
 
@@ -335,7 +350,6 @@
 
   FXP.buildJerseyMap = buildJerseyMap;
   FXP.jerseyFromCrest = jerseyFromCrest;
-  FXP.formatOpp = formatOpp;
   FXP.ensureContainer = ensureContainer;
   FXP.buildPitchMarks = buildPitchMarks;
   FXP.render = render;

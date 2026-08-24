@@ -21,16 +21,29 @@
  *
  * buildTooltipLines() entries are either plain strings or hybrid
  * { text, pts } objects (see tooltip.js); buildStatsSection renders both
- * via tooltip.js's shared FXP.renderTipLine(), so the colored (+N)/(-N)
- * points span looks identical here and in the hover tooltip. This relies
- * on tooltip.css's .fx-tip-pts* classes, which are safe to reuse here since
- * manifest.json loads tooltip.css and action-menu.css together on the same
- * roster-page content script entry.
+ * via the shared FXShared.renderStatLine() (src/shared/touch-overlay.js),
+ * so the colored (+N)/(-N) points span looks identical here, in the hover
+ * tooltip, AND in matchup's tooltip -- all three now go through one
+ * function and one set of CSS classes (touch-overlay.css) instead of each
+ * feature maintaining its own copy.
+ *
+ * On a coarse-pointer (touch) device this menu is anchored to the tapped
+ * card -- not the raw tap coordinates -- via FXShared.anchorToElement, kept
+ * stuck to the card through a scroll via FXShared.trackAnchor (closing the
+ * menu if the card ever goes stale/detached), and dims every other
+ * `.fx-card` via FXShared.selectAndDim while it's open. This mirrors
+ * matchup's touch-tooltip mechanics exactly (same shared module, keyed
+ * 'fxp' so its scroll-tracker can't collide with matchup's 'fxm' one). The
+ * desktop (fine-pointer) menu keeps the original raw-coordinate
+ * positioning (positionMenu below) -- it isn't anchored to any one card in
+ * the same "don't cover the tapped player" sense a touch tap is, since a
+ * mouse click's own cursor position is never mistaken for the card itself.
  * ---------------------------------------------------------------------
  */
 (function (FXP) {
   'use strict';
   const state = FXP.state;
+  const FXShared = window.FXShared;
 
   function triggerRowAction(p, selector) {
     const row = FXP.findRowByName(p.name);
@@ -78,7 +91,7 @@
     lines.forEach((line, i) => {
       const row = document.createElement('div');
       row.className = i === 0 ? 'fx-action-menu__stats-title' : 'fx-action-menu__stats-row';
-      FXP.renderTipLine(row, line);
+      FXShared.renderStatLine(row, line);
       section.appendChild(row);
     });
     return section;
@@ -97,10 +110,21 @@
       state.actionMenuEl.remove();
       state.actionMenuEl = null;
     }
+    // Single choke point for every close path (tap-outside via onDocClick,
+    // Escape via onKeydown, or picking a menu item) -- tearing down the
+    // scroll-tracker and clearing the tap-select dimming here means none
+    // of those callers need to remember to do it themselves. Both are
+    // no-ops when the menu was opened on the desktop (fine-pointer) path,
+    // since only the coarse-pointer path below ever registers/dims them.
+    FXShared.stopTrackingAnchor('fxp');
+    FXShared.clearDim(state.container || document, '.fx-card', 'fx-card--dimmed');
     document.removeEventListener('click', onDocClick, true);
     document.removeEventListener('keydown', onKeydown, true);
   }
 
+  // Desktop (fine-pointer) positioning only -- raw tap/click coordinates,
+  // clamped to the viewport. See openActionMenu for why the coarse-pointer
+  // (touch) path uses FXShared.anchorToElement against the card instead.
   function positionMenu(menu, x, y) {
     const rect = menu.getBoundingClientRect();
     let left = x;
@@ -117,8 +141,9 @@
 
     const menu = document.createElement('div');
     menu.className = 'fx-action-menu';
+    const coarse = isCoarsePointer();
 
-    if (isCoarsePointer()) {
+    if (coarse) {
       const statsSection = buildStatsSection(p);
       if (statsSection) {
         menu.appendChild(statsSection);
@@ -149,7 +174,33 @@
 
     document.body.appendChild(menu);
     state.actionMenuEl = menu;
-    positionMenu(menu, x, y);
+
+    if (coarse) {
+      // Anchor to the CARD (mirrors matchup's touch tooltip) rather than
+      // the raw tap coordinates, so the menu never covers the tapped
+      // player card -- the exact complaint that was just fixed for
+      // matchup. FXShared.trackAnchor keeps it stuck to the card through a
+      // scroll, closing the menu (via closeActionMenu, which also tears
+      // down the tracker) if the card ever goes stale/detached from a
+      // re-render.
+      const reposition = () => FXShared.anchorToElement(menu, card, { gap: 8, margin: 8 });
+      reposition();
+      FXShared.trackAnchor('fxp', {
+        overlayEl: menu,
+        targetEl: card,
+        isVisible: () => !!state.actionMenuEl,
+        onReposition: reposition,
+        onStale: closeActionMenu,
+      });
+      // Dim every other player card so it's unambiguous which one this
+      // menu belongs to -- roster's equivalent of matchup's tap-select
+      // dimming. Touch path only; desktop's menu isn't tied to a single
+      // "selected" card in the same way.
+      FXShared.selectAndDim(state.container || document, '.fx-card', card, 'fx-card--dimmed');
+    } else {
+      positionMenu(menu, x, y);
+    }
+
     // Deferred so the click that opened the menu doesn't immediately close it.
     setTimeout(() => {
       document.addEventListener('click', onDocClick, true);

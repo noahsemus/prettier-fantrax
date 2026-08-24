@@ -13,17 +13,20 @@
  * string (title/loading/projection/fallback lines, rendered via
  * textContent) or, for a hybrid raw+points line, an object
  * { text: '4 Saves', pts: '+2' } -- text is the raw-count/stat-name part,
- * pts is the already-signed points value WITHOUT its parentheses. Renderers
- * (here and action-menu.js's buildStatsSection) turn the object into
- * "<text> (" + a colored <span class="fx-tip-pts fx-tip-pts--pos|neg|zero">
- * + ")", built with createElement/createTextNode -- never innerHTML with
- * interpolated data. The color reflects the sign of pts: green for
- * positive, red for negative, muted gray for zero.
+ * pts is the already-signed points value WITHOUT its parentheses. Rendering
+ * is FXShared.renderStatLine (src/shared/touch-overlay.js), shared with
+ * action-menu.js's buildStatsSection AND matchup/render.js's tooltip --
+ * turns the object into "<text> (" + a colored
+ * <span class="fxs-stat-pts fxs-stat-pts--pos|neg|zero"> + ")", built with
+ * createElement/createTextNode -- never innerHTML with interpolated data.
+ * The color reflects the sign of pts: green for positive, red for
+ * negative, muted gray for zero.
  * ---------------------------------------------------------------------
  */
 (function (FXP) {
   'use strict';
   const state = FXP.state;
+  const FXShared = window.FXShared;
 
   // Defensive: state.js (owned elsewhere) may not yet declare this cache.
   state.rawStatsCache = state.rawStatsCache || new Map();
@@ -44,37 +47,11 @@
     lines.forEach((line, i) => {
       const row = document.createElement('div');
       row.className = i === 0 ? 'fx-card-tip__title' : 'fx-card-tip__row';
-      renderTipLine(row, line);
+      FXShared.renderStatLine(row, line);
       el.appendChild(row);
     });
     el.classList.add('fx-card-tip--visible');
     positionCardTip(x, y);
-  }
-
-  // Decide the color class for a signed points string like "+6", "-2", "0".
-  function ptsClass(pts) {
-    const n = parseFloat(pts);
-    if (n > 0) return 'fx-tip-pts--pos';
-    if (n < 0) return 'fx-tip-pts--neg';
-    return 'fx-tip-pts--zero';
-  }
-
-  // Append a tooltip line's content into `row`: a plain string via
-  // textContent, or a hybrid { text, pts } object as "<text> (" + a colored
-  // pts span + ")" via createElement/createTextNode. Shared with
-  // action-menu.js's buildStatsSection, which renders the same
-  // buildTooltipLines() output inside its touch-device stats section.
-  function renderTipLine(row, line) {
-    if (typeof line === 'string') {
-      row.textContent = line;
-      return;
-    }
-    row.appendChild(document.createTextNode(`${line.text} (`));
-    const span = document.createElement('span');
-    span.className = `fx-tip-pts ${ptsClass(line.pts)}`;
-    span.textContent = line.pts;
-    row.appendChild(span);
-    row.appendChild(document.createTextNode(')'));
   }
 
   function positionCardTip(x, y) {
@@ -142,5 +119,4 @@
   FXP.hideCardTip = hideCardTip;
   FXP.refreshOpenTooltip = refreshOpenTooltip;
   FXP.buildTooltipLines = buildTooltipLines;
-  FXP.renderTipLine = renderTipLine;
 })(window.FXP);

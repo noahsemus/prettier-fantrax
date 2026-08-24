@@ -14,12 +14,37 @@
  * that single ordering reads correctly as "home left / away right,
  * mirrored" in row layout and "home top / away bottom, mirrored" in column
  * layout with no JS branching on orientation.
+ *
+ * The hover/tap breakdown tooltip (buildTooltipLines) LAYERS window.FXC on
+ * top of each player's own currently-rendered stat chips (parse.js's
+ * p.chips): content.js briefly, programmatically flips the page's
+ * Stats/Fpts pill (now masked -- see content.js's header comment -- so
+ * the user never sees it) to snapshot the OTHER mode and publishes a
+ * merged raw+fpts reading to window.FXC, keyed by player name. When FXC
+ * has BOTH readings for a given player, buildTooltipLines shows the
+ * hybrid line (e.g. "1 Assists (Total) (+6)"); otherwise it falls back to
+ * that player's own p.chips (single, currently-active-mode value) --
+ * FXC is purely an enhancement layer, never a hard requirement, so the
+ * tooltip is never stuck waiting on it (see buildTooltipLines' own
+ * comment for why that distinction matters).
+ *
+ * render() tears down and rebuilds EVERY `.fxm-card` node on every
+ * re-render, and this livescoring page's own DOM mutations (live score
+ * updates) trigger that rebuild often via the MutationObserver in main.js
+ * -- including while a player is tap-selected (dimmed + tooltip open) on
+ * touch. Tracking WHO is selected by identity (state.selectedIdentity,
+ * not a DOM node reference -- see state.js) rather than just a stale
+ * `tooltipTargetEl` lets render() re-locate that same player's freshly
+ * built card and re-apply the dim/tooltip there (reapplySelection, called
+ * at the end of render()) instead of the selection silently reverting
+ * within about a second of a live-score-driven re-render.
  * ---------------------------------------------------------------------
  */
 (function (FXM) {
   'use strict';
   const qa = FXM.qa;
   const state = FXM.state;
+  const FXShared = window.FXShared;
 
   // ---------- jersey URL construction from crest ----------
   // Same rules as pitch-editor/render.js's jerseyFromCrest (EPL-only jersey
@@ -61,26 +86,37 @@
     return tip;
   }
 
-  // A line is either a plain string, or `{ text, paren, kind }` for a stat
-  // line that has a color-coded parenthetical signed-points suffix (e.g.
+  // A line is either a plain string, or `{ text, pts }` for a stat line
+  // that has a color-coded parenthetical signed-points suffix (e.g.
   // "1 Assists (Total)" + a green/red/muted "(+6)" span) -- see
-  // buildTooltipLines. Keeping the parenthetical as its own span (not
-  // baked into the row's plain text) is what lets it carry its own color.
-  function showTooltip(lines, x, y) {
-    if (!lines || !lines.length) return;
+  // buildTooltipLines. Rendering (including the parenthetical's own
+  // color-coded span) is FXShared.renderStatLine, shared with
+  // pitch-editor's tooltip/action-menu stat lines -- see
+  // src/shared/touch-overlay.js.
+  //
+  // Shared by both the mouse (showTooltip) and touch (showTooltipForCard)
+  // paths -- building the row DOM is identical either way, only how the
+  // tip then gets POSITIONED differs (raw cursor coords vs. anchored to a
+  // card element), so that split lives one level up, not duplicated here.
+  function renderTooltipContent(lines) {
     const tip = ensureTooltip();
     tip.innerHTML = '';
     lines.forEach((line, i) => {
       const row = el('div', i === 0 ? 'fxm-tip__title' : 'fxm-tip__row');
-      if (typeof line === 'string') {
-        row.textContent = line;
-      } else {
-        row.appendChild(document.createTextNode(`${line.text} `));
-        row.appendChild(el('span', `fxm-tip__stat fxm-tip__stat--${line.kind}`, `(${line.paren})`));
-      }
+      FXShared.renderStatLine(row, line);
       tip.appendChild(row);
     });
     tip.classList.add('fxm-tip--visible');
+    return tip;
+  }
+
+  // Desktop mouse path only -- positions the tip near the live cursor
+  // coordinates, flipping to the other side of the pointer if it would
+  // otherwise overflow the viewport. Untouched by the touch/anchor work
+  // below; see attachHoverTooltip's mouseenter/mousemove.
+  function showTooltip(lines, x, y) {
+    if (!lines || !lines.length) return;
+    renderTooltipContent(lines);
     positionTooltip(x, y);
   }
 
@@ -97,9 +133,97 @@
     tip.style.top = `${Math.max(4, top)}px`;
   }
 
+  // Touch path -- see showTooltipForCard below for why this anchors to the
+  // CARD element's rect instead of a raw touch point.
+  const TIP_CARD_GAP = 8; // px gap kept between the tip and its anchor card
+  // Net finger movement (px) between touchstart and touchend on a card
+  // under which a touchend still counts as a tap rather than the tail end
+  // of a scroll -- see attachHoverTooltip's FXShared.onTap wiring. Same
+  // value and same idea as pitch-editor/drag.js's TOUCH_MOVE_CANCEL_PX.
+  const TOUCH_TAP_MOVE_PX = 10;
+
+  // Touch has no hover, so a tap anchors the tip to the CARD it just
+  // tapped rather than to the touch point (positionTooltip above) -- a
+  // tapped card is itself ~58-76px, so an offset-from-finger tip routinely
+  // landed right on top of it. FXShared.anchorToElement (src/shared/
+  // touch-overlay.js) owns the flush-above/below + viewport-clamp math --
+  // the exact algorithm this file originally had inline, now shared with
+  // pitch-editor's action menu. Registering with FXShared.trackAnchor
+  // keeps the tip "stuck" to the card through a scroll (re-anchoring on
+  // every scroll event) and hides it via hideTooltip if the card ever goes
+  // stale -- detached from the document because render()'s
+  // MutationObserver-driven re-renders tear down and rebuild EVERY
+  // `.fxm-card` node from scratch (see render()'s own comment), which can
+  // happen from Fantrax's own live-updating page content with no user
+  // action at all. Keyed 'fxm' so this tracker can't collide with
+  // pitch-editor's own 'fxp'-keyed action-menu tracker.
+  function showTooltipForCard(lines, cardEl) {
+    if (!lines || !lines.length) return;
+    renderTooltipContent(lines);
+    state.tooltipTargetEl = cardEl;
+    const reposition = () => FXShared.anchorToElement(state.tooltipEl, cardEl, { gap: TIP_CARD_GAP, margin: 8 });
+    reposition();
+    FXShared.trackAnchor('fxm', {
+      overlayEl: state.tooltipEl,
+      targetEl: cardEl,
+      isVisible: () => !!(state.tooltipEl && state.tooltipEl.classList.contains('fxm-tip--visible')),
+      onReposition: reposition,
+      onStale: hideTooltip,
+    });
+  }
+
   function hideTooltip() {
     if (state.tooltipEl) state.tooltipEl.classList.remove('fxm-tip--visible');
     state.hoveredName = null;
+    state.tooltipTargetEl = null;
+    FXShared.stopTrackingAnchor('fxm');
+    // Single choke point for every close path (toggle-close, tap-outside via
+    // onOutsideTap, mouseleave, and the stale-target scroll-hide via
+    // FXShared.trackAnchor's onStale above) -- clearing the tap-select
+    // dimming here means none of those callers need to remember to do it
+    // themselves. A no-op on desktop/mouse closes since setSelectedCard is
+    // only ever called from the touch tap path below, so there's nothing
+    // to clear.
+    clearSelectedCard();
+  }
+
+  // ---------- touch tap-select dimming ----------
+  // Touch-only "which card did I just tap" affordance: dims every OTHER
+  // `.fxm-card` (pitch and bench, both teams) so the tapped player reads
+  // unambiguously against the rest of the pitch. Deliberately NOT wired off
+  // desktop mouseenter -- that would dim the whole pitch on every hover,
+  // a much more intrusive change to already-established hover behavior.
+  // Scoped to state.container (falling back to the whole document if the
+  // container ever isn't set) rather than a fixed root, since it must reach
+  // both teams' halves and both benches, which live in the same body.
+  //
+  // The dim mechanic itself (FXShared.selectAndDim/clearDim) is shared with
+  // pitch-editor's roster dimming -- purely mechanical class add/remove, so
+  // `.fxm-card--dimmed` keeps its own name and its own CSS in matchup.css.
+  // `.fxm-card--selected` carries no styling of its own (see matchup.css) --
+  // kept as a plain DOM hook local to this feature, not part of the shared
+  // module's contract.
+  //
+  // Also the ONE place state.selectedIdentity gets set/cleared (from the
+  // card's own dataset -- see renderCard's data-side/data-bench/data-name)
+  // -- see state.js's comment on why identity, not just a DOM ref, is
+  // tracked. render()'s reapplySelection call below re-invokes this same
+  // function on the freshly-rebuilt card, which is a harmless no-op
+  // re-derivation of the same identity.
+  function setSelectedCard(cardEl) {
+    const root = state.container || document;
+    FXShared.selectAndDim(root, '.fxm-card', cardEl, 'fxm-card--dimmed');
+    FXM.qa('.fxm-card', root).forEach((c) => c.classList.toggle('fxm-card--selected', c === cardEl));
+    state.selectedIdentity = cardEl
+      ? { side: cardEl.dataset.side || null, isBench: cardEl.dataset.bench === '1', name: cardEl.dataset.name || null }
+      : null;
+  }
+
+  function clearSelectedCard() {
+    const root = state.container || document;
+    FXShared.clearDim(root, '.fxm-card', 'fxm-card--dimmed');
+    FXM.qa('.fxm-card', root).forEach((c) => c.classList.remove('fxm-card--selected'));
+    state.selectedIdentity = null;
   }
 
   // Touch has no real hover -- mouseenter/mouseleave (attachHoverTooltip
@@ -136,11 +260,6 @@
     return n > 0 ? `+${text}` : text;
   }
 
-  function signKind(text) {
-    const n = parseFloat(text);
-    return n > 0 ? 'pos' : n < 0 ? 'neg' : 'zero';
-  }
-
   // Classifies a player's game from parse.js's p.gameText -- see parseSide's
   // comment for why this is necessary (the same DOM cell holds a real score
   // once the game starts and a mere projection before it, with no other
@@ -155,12 +274,13 @@
   // finished Sat/Sun games and Monday games not yet kicked off) and never
   // observed a gameText that was neither a trailing " F" score nor a
   // scheduled clock time, so there's nothing to confirm what an in-progress
-  // row's text actually looks like. Rather than guess a regex for it (and
-  // risk mislabeling a real state on a card), unrecognized text just stays
-  // 'unknown' -- render.js's dot logic (see gameDotInfo) deliberately shows
-  // no dot at all for 'unknown' rather than a guessed one. If a genuinely
-  // distinguishable live format ever turns up, add a dedicated branch (and
-  // dot) then.
+  // row's text actually looks like. Rather than guess a regex for it, an
+  // unrecognized gameText just stays 'unknown'. Still used by
+  // buildTooltipLines (finished vs upcoming messaging) and renderCard (never
+  // showing an upcoming player's projection as if it were an earned score)
+  // -- NOT by the status dot any more, see EVENT_STATUS_LABEL/renderCard
+  // below, which reads Fantrax's own pre-kickoff `.scorer-icon` indicator
+  // instead (parse.js's p.eventStatus).
   function gameState(gameText) {
     if (!gameText) return 'unknown';
     if (/\sF$/.test(gameText)) return 'finished';
@@ -168,66 +288,70 @@
     return 'unknown';
   }
 
-  // Pulls the scheduled kickoff substring (e.g. "Mon 3:00 PM") out of an
-  // 'upcoming' gameText like "@FUL Mon 3:00 PM", for the upcoming dot's
-  // tooltip -- falls back to null (caller uses a generic message) if the
-  // text doesn't match the expected shape.
-  function scheduledTimeText(gameText) {
-    const m = gameText && gameText.match(/((?:[A-Za-z]{3}\s+)?\d{1,2}:\d{2}\s*[AP]M)/i);
-    return m ? m[1] : null;
+  // Status-dot label text, mirroring pitch-editor/roster.js's
+  // EVENT_STATUS_LABEL exactly (own literal copy, not imported -- this
+  // module must stand on its own regardless of script load order between
+  // the pitch-editor and matchup features, same reasoning as
+  // readCrestFromFigure in parse.js). Keyed by parse.js's p.eventStatus
+  // values ('starting'/'expected'/'bench'/'out'), which parse.js derives
+  // from the SAME `.scorer-icon` classes roster.js's readEventStatus reads
+  // -- Fantrax's real pre-kickoff "is this player playing" indicator,
+  // present only before kickoff. A player whose game has started or
+  // finished simply has no `.scorer-icon` and no eventStatus, and
+  // renderCard below shows no dot at all for them -- see matchup.css's
+  // .fxm-card__dot comment for the exact "why".
+  const EVENT_STATUS_LABEL = {
+    starting: 'Confirmed starting',
+    expected: 'Expected to play',
+    bench: 'Expected to be on the bench',
+    out: 'Not expected to play',
+  };
+
+  // Mode pill lookup (Stats/Fpts), same "Mode" pill-group content.js reads
+  // -- duplicated locally rather than imported, for the same stand-alone-
+  // module reason as jerseyFromCrest/readEventStatus above: this module
+  // must work regardless of script load order between features.
+  function getModeButtons() {
+    const group = document.querySelector('pill-group[aria-label="Mode"]');
+    if (!group) return null;
+    const buttons = Array.from(group.querySelectorAll('button.pill'));
+    const stats = buttons.find((b) => b.textContent.trim() === 'Stats');
+    const fpts = buttons.find((b) => b.textContent.trim() === 'Fpts');
+    if (!stats || !fpts) return null;
+    return { stats, fpts };
   }
 
-  // Small colored dot rendered next to a card's name, signaling WHY their
-  // points total reads the way it does (a 0 because they actually scored
-  // 0, vs a 0 because they simply haven't played yet) -- see the user-
-  // facing motivation in matchup.css's dot rules. Deliberately a different
-  // color palette from .fxm-card__pts's gold/red pos/neg colors (same
-  // card, different meaning -- reusing green/red here would read as
-  // "positive/negative points" instead of "game state"). Returns null (no
-  // dot at all) for 'unknown' -- see gameState's comment for why that
-  // state exists and why it never gets a guessed dot.
-  function gameDotInfo(gameText) {
-    const st = gameState(gameText);
-    if (st === 'finished') {
-      return { kind: 'finished', title: 'Game finished' };
-    }
-    if (st === 'upcoming') {
-      const when = scheduledTimeText(gameText);
-      return {
-        kind: 'upcoming',
-        title: when ? `Hasn't played yet — kicks off ${when}` : "Hasn't played yet",
-      };
-    }
-    return null;
-  }
-
-  // Preferred source: window.FXC (published by content.js) -- a merged
+  // Layered: prefer window.FXC (published by content.js) -- a merged
   // reading of BOTH the raw count and the fpts contribution for every stat
-  // chip, keyed by player name. Falls back to this player's own current-
-  // mode chips (parse.js's p.chips) when FXC is missing, or doesn't have
-  // this player in *both* its raw and fpts maps ("lacks the player/mode").
-  // Line format is raw-first: "«raw» «stat name» («+signedPts»)", e.g.
-  // "1 Assists (Total) (+6)" -- matching pitch-editor/content.js's tooltip
-  // format exactly, including the parenthetical being its own color-coded
-  // span (green positive / red negative / muted zero -- see showTooltip
-  // and matchup.css's .fxm-tip__stat--pos/neg/zero). Degrades to whichever
-  // single value is known when only one side is available (no
-  // parenthetical, plain text).
+  // chip, keyed by player name, captured via a brief, now-MASKED (see
+  // content.js's header comment) Stats/Fpts pill flip -- when it actually
+  // has BOTH readings for this player. Falls back to this player's own
+  // currently-rendered stat chips (parse.js's p.chips, the CURRENT view's
+  // per-chip value only) whenever FXC is absent or doesn't have this
+  // player yet.
   //
-  // "Loading breakdown…" is reserved for the genuinely transient case --
-  // window.FXC hasn't been published at all yet (content.js's first
-  // snapshot is still in flight). Once FXC exists, a player who still has
-  // no data there and no chips of their own most likely just hasn't played
-  // this gameweek -- that's a terminal state, not something to keep
-  // "loading" forever, so it falls through to their projection (or an
-  // explicit "hasn't played" line) instead.
+  // FXC is an ENHANCEMENT layer only, never a hard requirement -- this
+  // function used to `return ['Loading breakdown…']` outright whenever FXC
+  // was absent, which left the tooltip stuck on that message forever for
+  // anyone whose first snapshot hadn't landed (or who never gets one, e.g.
+  // the mode toggle isn't found on their layout). That hard dependency is
+  // gone: p.chips is always available the instant parse.js has run, so
+  // FXC merely upgrades an already-showing single-value line into the
+  // hybrid raw+fpts one the moment it becomes available for this player,
+  // exactly mirroring content.js's own single-live-value tooltip
+  // upgrading to hybrid once its counterpart-mode cache is populated.
+  //
+  // Line format is raw-first: "«raw» «stat name» («+signedPts»)", e.g.
+  // "1 Assists (Total) (+6)" -- matching content.js's tooltip format
+  // exactly, including the parenthetical being its own color-coded span
+  // (FXShared.renderStatLine's `{ text, pts }` shape -- green positive /
+  // red negative / muted zero). Degrades to whichever single value is
+  // known when only one side is available (no parenthetical, plain text).
   function buildTooltipLines(p) {
     const statNames = window.FX_STAT_NAMES || {};
     const fxc = window.FXC;
-    if (!fxc) return ['Loading breakdown…'];
-
-    const rawMap = fxc.raw && fxc.raw.get(p.name);
-    const fptsMap = fxc.fpts && fxc.fpts.get(p.name);
+    const rawMap = fxc && fxc.raw && fxc.raw.get(p.name);
+    const fptsMap = fxc && fxc.fpts && fxc.fpts.get(p.name);
 
     if (rawMap && fptsMap) {
       const abbrs = [];
@@ -247,10 +371,9 @@
           const ptsText = fptsMap.get(abbr);
           const rawText = rawMap.get(abbr);
           if (ptsText !== undefined && rawText !== undefined) {
-            // Color-coded parenthetical -- own span (see showTooltip), not
-            // baked into a plain string, so it can be green/red/muted
-            // independent of the row's own text color.
-            lines.push({ text: `${rawText} ${fullName}`, paren: formatSigned(ptsText), kind: signKind(ptsText) });
+            // { text, pts } -- rendered by FXShared.renderStatLine as
+            // "<text> (" + a color-coded pts span + ")".
+            lines.push({ text: `${rawText} ${fullName}`, pts: formatSigned(ptsText) });
           } else if (rawText !== undefined) {
             lines.push(`${rawText} ${fullName}`);
           } else if (ptsText !== undefined) {
@@ -261,10 +384,17 @@
       }
     }
 
+    // FXC enhancement unavailable for this player -- fall back to their
+    // own currently-rendered stat chips (parse.js's p.chips), the CURRENT
+    // view's per-chip value (raw count or fpts, whichever mode's pill is
+    // active right now).
     if (p.chips && p.chips.size) {
+      const buttons = getModeButtons();
+      const onFpts = !!(buttons && buttons.fpts.classList.contains('pill--active'));
       const lines = [`${p.points || '0'} pts:`];
       p.chips.forEach((value, abbr) => {
-        lines.push(`${value} ${statNames[abbr] || abbr}`);
+        const fullName = statNames[abbr] || abbr;
+        lines.push(`${onFpts ? formatSigned(value) : value} ${fullName}`);
       });
       return lines;
     }
@@ -302,6 +432,55 @@
       }
     });
     card.addEventListener('mouseleave', hideTooltip);
+
+    // Tap-to-TOGGLE on touch devices. Without this, a tap is indistinguishable
+    // from a mouseenter above (an unprevented touch gesture makes the browser
+    // synthesize mouseenter/mousemove/click right after it), which can only
+    // ever OPEN or reposition the tooltip -- there's no mouseleave-equivalent
+    // to close it on a second tap of the SAME card, since touch has no
+    // pointer to "leave" with. This handler owns the whole tap gesture
+    // instead: calling preventDefault in touchend (when the event is
+    // cancelable -- see below) suppresses that synthetic mouse-event chain
+    // (well-established behavior -- preventDefault on touchstart OR touchend
+    // blocks the compatibility mouse events for that gesture), so mouseenter
+    // above never even fires for a tap and this is the ONLY logic that runs.
+    // Desktop mouseenter/mousemove/mouseleave above are untouched --
+    // touchend simply never fires for a real mouse.
+    //
+    // Anchored to the CARD, not the touch point: unlike the mouse path
+    // (which follows the live cursor and so is never mistaken for covering
+    // the pointed-at element), a tap's x/y IS the card the user just
+    // touched -- offsetting a fixed amount from it routinely put the tip
+    // right on top of the card. showTooltipForCard positions off the
+    // card's own rect instead (via FXShared.anchorToElement), and tracks it
+    // through scroll via FXShared.trackAnchor.
+    //
+    // The tap-vs-scroll gesture gating (net finger movement under
+    // TOUCH_TAP_MOVE_PX between touchstart and touchend, cancelable-safe
+    // preventDefault) is FXShared.onTap (src/shared/touch-overlay.js) --
+    // the exact mechanics this file originally had inline, now shared with
+    // anything else that needs "was this touchend a real tap." Not the
+    // same concern as pitch-editor/drag.js's own long-press-vs-scroll state
+    // machine (that one decides whether to START A DRAG); this one decides
+    // whether to open/toggle the tooltip.
+    FXShared.onTap(
+      card,
+      () => {
+        const alreadyOpenHere =
+          state.tooltipEl && state.tooltipEl.classList.contains('fxm-tip--visible') && state.hoveredName === p.name;
+        if (alreadyOpenHere) {
+          hideTooltip();
+          return;
+        }
+        state.hoveredName = p.name;
+        showTooltipForCard(buildTooltipLines(p), card);
+        // Dim every other card so it's unambiguous which player this tip
+        // belongs to. Touch-tap path only (see setSelectedCard) -- desktop
+        // hover intentionally leaves every other card alone.
+        setSelectedCard(card);
+      },
+      { moveThresholdPx: TOUCH_TAP_MOVE_PX }
+    );
   }
 
   // ---------- player / bench cards ----------
@@ -316,8 +495,8 @@
   // different cards (e.g. the same player name appearing as both a
   // starter and, implausibly but not impossibly, a same-named opponent's
   // reserve) never share a ping-pong timeline. `side` is 'home'/'away',
-  // threaded down from renderField/renderBenchBar through renderLine /
-  // renderBenchCard -- there's no other per-card identity concept in this
+  // threaded down from renderField/render (renderBenchSide's caller) through
+  // renderLine/renderBenchCard -- there's no other per-card identity concept in this
   // module today (matchup cards have no synthetic key, per state.js's note
   // on state.hoveredName).
   function marqueeKey(side, isBench, name) {
@@ -327,6 +506,16 @@
   function renderCard(p, extraClass, side) {
     const isBench = extraClass === 'fxm-card--bench';
     const card = el('div', extraClass ? `fxm-card ${extraClass}` : 'fxm-card');
+    // Identity attributes, not just for marqueeKey (below) any more --
+    // render()'s reapplySelection also reads these back off the FRESHLY
+    // rebuilt card to re-locate whichever player was tap-selected before a
+    // live-score-driven rebuild tore the old node out from under it. Same
+    // side:isBench:name shape as marqueeKey, so the two stay in lockstep.
+    if (p.name) {
+      card.dataset.side = side || '';
+      card.dataset.bench = isBench ? '1' : '0';
+      card.dataset.name = p.name;
+    }
     const constructed = jerseyFromCrest(p.crest, p.pos);
     const jerseySrc = constructed || p.crest;
     if (jerseySrc) {
@@ -349,18 +538,12 @@
     // independently of the (overflow: hidden) outer container -- see
     // applyNameMarquee, called once per render after the cards are
     // actually laid out in the document (scrollWidth is meaningless on a
-    // detached fragment).
+    // detached fragment). No status dot in this row any more -- it used to
+    // sit inline before the name text, which ate into an already
+    // space-starved name box (that's exactly why names marquee at all) and
+    // could shrink a long name's available width down to almost nothing.
+    // The dot is now a corner badge on the card itself -- see below.
     const nameEl = el('div', 'fxm-card__name');
-    // Game-state dot (see gameDotInfo) lives outside the name-text span so
-    // it stays fixed in place while only the name text itself marquees --
-    // same placement as pitch-editor/render.js's event-status dot relative
-    // to .fx-card__name-inner.
-    const dotInfo = p.name ? gameDotInfo(p.gameText) : null;
-    if (dotInfo) {
-      const dot = el('span', `fxm-card__dot fxm-card__dot--${dotInfo.kind}`);
-      dot.title = dotInfo.title;
-      nameEl.appendChild(dot);
-    }
     // Stashed for applyNameMarquee to read back once this card is actually
     // laid out in the document -- see marqueeKey above.
     if (p.name) nameEl.dataset.marqueeKey = marqueeKey(side, isBench, p.name);
@@ -383,7 +566,39 @@
     const ptsN = parseFloat(ptsText);
     const ptsKind = ptsN > 0 ? 'pos' : ptsN < 0 ? 'neg' : 'zero';
     info.appendChild(el('div', `fxm-card__pts fxm-card__pts--${ptsKind}`, ptsText));
+    // Game/opponent line (e.g. "MUN 0 @ HUL 2 F"), directly under the
+    // points -- same formatting logic as pitch-editor's .fx-card__opp
+    // (FXShared.formatOpp, src/shared/touch-overlay.js: shared LOGIC, own
+    // feature-scoped DOM/CSS, per the user's "these should be the same
+    // component"). Skipped entirely when there's no text at all (e.g. an
+    // empty slot never reaches here since p.name is required below, but a
+    // real player can still have an empty gameText in edge cases).
+    const opp = FXShared.formatOpp(p.gameText);
+    if (opp) {
+      const oppEl = el('div', 'fxm-card__opp');
+      // Own marquee-key namespace ('opp:' prefix over the SAME
+      // side:isBench:name identity marqueeKey builds for the name row) so
+      // this element's persisted cycle-start time in state.marqueeStarts
+      // can never collide with the name row's own entry for the same card
+      // -- see applyMarqueeToSet's comment for why the two must stay
+      // disjoint.
+      if (p.name) oppEl.dataset.marqueeKey = `opp:${marqueeKey(side, isBench, p.name)}`;
+      oppEl.appendChild(el('span', 'fxm-card__opp-text', opp));
+      info.appendChild(oppEl);
+    }
     card.appendChild(info);
+    // Status dot, pinned to the card's own bottom-left corner (matchup.css
+    // gives .fxm-card position: relative and positions the dot absolutely
+    // against IT, not against .fxm-card__info or the name row) -- ONLY when
+    // parse.js actually found a `.scorer-icon` for this player, which on
+    // Fantrax's own page only exists pre-kickoff. No eventStatus means the
+    // player's game has already started or finished, and no dot is shown
+    // at all for them -- not a fallback color, just nothing.
+    if (p.name && p.eventStatus) {
+      const dot = el('span', `fxm-card__dot fxm-card__dot--${p.eventStatus}`);
+      dot.title = EVENT_STATUS_LABEL[p.eventStatus] || '';
+      card.appendChild(dot);
+    }
     // Skip hover wiring on empty slots -- parse.js never actually hands us
     // one (parseSide returns null and callers skip it), but guard on p.name
     // anyway so this stays correct if that ever changes.
@@ -395,26 +610,56 @@
     return renderCard(p, 'fxm-card--bench', side);
   }
 
-  // A name too wide for its card gets a slow back-and-forth marquee scroll
-  // instead of an ellipsis, so the full name stays readable. Must run
+  // A name too wide for its box gets a slow back-and-forth marquee scroll
+  // instead of an ellipsis/clip, so the full name stays readable. Must run
   // after `root` is actually attached to the document (scrollWidth on a
   // still-detached fragment is meaningless) -- callers use
-  // requestAnimationFrame after the DOM insertion, not before. Applies to
-  // both pitch and bench cards since both share `.fxm-card__name`.
+  // requestAnimationFrame after the DOM insertion, not before. Shared by
+  // both player-card names (`.fxm-card__name`, both pitch and bench, since
+  // both share that class) AND the per-team header names
+  // (`.fxm-team-header__name`) -- one generic measure/apply pass
+  // (applyMarqueeToSet) run once per selector pair below, rather than two
+  // parallel copies of the same logic.
   //
-  // matchup.css's `.fxm-card__name--marquee .fxm-card__name-text` animation
-  // is declared `infinite alternate` (ping-pong) already -- that alone
-  // would be enough on a static page. It isn't enough here because render()
-  // tears down and fully rebuilds EVERY card's DOM on every re-render (the
-  // MutationObserver in main.js fires often, well inside a single 6s
+  // matchup.css's `<selector>--marquee <selector>-text` animation is
+  // declared `infinite alternate` (ping-pong) already -- that alone would
+  // be enough on a static page. It isn't enough here because render() tears
+  // down and fully rebuilds EVERY card and header node on every re-render
+  // (the MutationObserver in main.js fires often, well inside a single 6s
   // marquee cycle, as the live matchup page updates), and a freshly-created
   // element's CSS animation always restarts at 0% -- so without this, the
   // user never sees a leg of the ping-pong complete; it just looks like the
-  // marquee keeps snapping back to the start. Fix: persist when each card's
-  // cycle "started" (state.marqueeStarts, keyed by marqueeKey) across
-  // re-renders, and apply a negative `animation-delay` to the freshly-built
-  // node so the browser treats it as already partway through the cycle --
-  // i.e. resumes mid-cycle instead of restarting.
+  // marquee keeps snapping back to the start. Fix: persist when each
+  // element's cycle "started" (state.marqueeStarts, keyed by
+  // data-marquee-key) across re-renders, and apply a negative
+  // `animation-delay` to the freshly-built node so the browser treats it as
+  // already partway through the cycle -- i.e. resumes mid-cycle instead of
+  // restarting. Player-card name keys (marqueeKey, e.g.
+  // "home:p:Erling Haaland"), that same card's own game/opponent-line key
+  // (e.g. "opp:home:p:Erling Haaland" -- see renderCard), and header keys
+  // (e.g. "header:home") are all disjoint by construction (a player name
+  // never starts with "opp:" or "header:"), so all three sets safely share
+  // the one state.marqueeStarts map with no collision risk.
+  function applyMarqueeToSet(root, nameSelector, textSelector, marqueeClass, nextStarts, now) {
+    qa(nameSelector, root).forEach((nameEl) => {
+      const overflow = nameEl.scrollWidth - nameEl.clientWidth;
+      if (overflow <= 0) return;
+      nameEl.classList.add(marqueeClass);
+      nameEl.style.setProperty('--fxm-marquee-dist', `-${overflow}px`);
+
+      const key = nameEl.dataset.marqueeKey;
+      const textEl = nameEl.querySelector(textSelector);
+      if (!key || !textEl) return;
+      const startTime = state.marqueeStarts.has(key) ? state.marqueeStarts.get(key) : now;
+      nextStarts.set(key, startTime);
+      const offsetSec = ((now - startTime) % 6000) / 1000;
+      // Negative delay = "act as though the animation already ran this
+      // long" -- resumes the ping-pong from the correct point instead of
+      // restarting at 0% the way a brand-new node otherwise would.
+      textEl.style.animationDelay = `-${offsetSec}s`;
+    });
+  }
+
   function applyNameMarquee(root) {
     // Defensive init here (not state.js) -- this codebase's convention for
     // a map that's only ever read/written by the one file that needs it;
@@ -425,23 +670,19 @@
     const now = Date.now();
     const nextStarts = new Map(); // pruned copy -- only keys touched below survive
 
-    qa('.fxm-card__name', root).forEach((nameEl) => {
-      const overflow = nameEl.scrollWidth - nameEl.clientWidth;
-      if (overflow <= 0) return;
-      nameEl.classList.add('fxm-card__name--marquee');
-      nameEl.style.setProperty('--fxm-marquee-dist', `-${overflow}px`);
-
-      const key = nameEl.dataset.marqueeKey;
-      const textEl = nameEl.querySelector('.fxm-card__name-text');
-      if (!key || !textEl) return;
-      const startTime = state.marqueeStarts.has(key) ? state.marqueeStarts.get(key) : now;
-      nextStarts.set(key, startTime);
-      const offsetSec = ((now - startTime) % 6000) / 1000;
-      // Negative delay = "act as though the animation already ran this
-      // long" -- resumes the ping-pong from the correct point instead of
-      // restarting at 0% the way a brand-new node otherwise would.
-      textEl.style.animationDelay = `-${offsetSec}s`;
-    });
+    applyMarqueeToSet(root, '.fxm-card__name', '.fxm-card__name-text', 'fxm-card__name--marquee', nextStarts, now);
+    applyMarqueeToSet(
+      root,
+      '.fxm-team-header__name',
+      '.fxm-team-header__name-text',
+      'fxm-team-header__name--marquee',
+      nextStarts,
+      now
+    );
+    // Game/opponent line (e.g. "MUN 0 @ HUL 2 F"), same mechanism, own
+    // 'opp:'-prefixed key namespace (see renderCard/marqueeKey) so it can't
+    // collide with that same card's name entry above.
+    applyMarqueeToSet(root, '.fxm-card__opp', '.fxm-card__opp-text', 'fxm-card__opp--marquee', nextStarts, now);
 
     // Drop start times for any key not touched this render (player no
     // longer overflowing, subbed out, or a different matchup entirely) so
@@ -458,9 +699,19 @@
   // layout separates them, home above the field next to home's half, away
   // below the field next to away's bench. See matchup.css.
 
-  function renderTeamHeader(side, extraClass) {
+  // `key` is 'home'/'away' -- team identity is stable across re-renders
+  // (unlike a player, who at least theoretically could change), so a plain
+  // "header:home"/"header:away" data-marquee-key is enough; no need for the
+  // richer side:isBench:name shape marqueeKey builds for player cards.
+  function renderTeamHeader(side, extraClass, key) {
     const header = el('div', `fxm-team-header ${extraClass}`);
-    header.appendChild(el('div', 'fxm-team-header__name', side.header.name || ''));
+    const nameEl = el('div', 'fxm-team-header__name');
+    nameEl.dataset.marqueeKey = `header:${key}`;
+    // Name text lives in an inner span, mirroring .fxm-card__name-text --
+    // see applyNameMarquee/applyMarqueeToSet, which measures/animates this
+    // exactly like a player card's name.
+    nameEl.appendChild(el('span', 'fxm-team-header__name-text', side.header.name || ''));
+    header.appendChild(nameEl);
     const scores = el('div', 'fxm-team-header__scores');
     scores.appendChild(el('span', 'fxm-team-header__live', side.header.live || '-'));
     scores.appendChild(el('span', 'fxm-team-header__projected', `proj ${side.header.projected || '-'}`));
@@ -545,6 +796,13 @@
   }
 
   // ---------- bench strip ----------
+  // Each team's bench is its own top-level `.fxm-body` grid item now, not
+  // nested inside a shared "bench bar" wrapper -- same restructuring as
+  // renderTeamHeader above, and for the same reason: matchup.css's
+  // grid-template-areas is what decides where each one sits. Wide layout
+  // puts them side by side in one row below the field (visually the old
+  // single bench bar); narrow layout pairs each bench with its own team's
+  // header on its own side of the field. See matchup.css.
 
   function renderBenchSide(reserves, extraClass, side) {
     const bench = el('div', `fxm-bench ${extraClass}`);
@@ -555,14 +813,57 @@
     return bench;
   }
 
-  function renderBenchBar(data) {
-    const bar = el('div', 'fxm-bench-bar');
-    bar.appendChild(renderBenchSide(data.home.reserves, 'fxm-bench--home', 'home'));
-    bar.appendChild(renderBenchSide(data.away.reserves, 'fxm-bench--away', 'away'));
-    return bar;
+  // ---------- container + top-level render ----------
+
+  // Looks up the player object matching a state.selectedIdentity (see
+  // state.js) inside `data`, the same parsed structure renderField/
+  // renderBenchSide just built the fresh cards from -- so if a card with
+  // that identity exists in the just-rendered DOM, this is guaranteed to
+  // find its matching player object too. Used by reapplySelection below.
+  function findPlayerByIdentity(data, identity) {
+    if (!identity) return null;
+    const sideData = data[identity.side];
+    if (!sideData) return null;
+    const list = identity.isBench ? sideData.reserves : FXM.POS_ORDER.flatMap((pos) => sideData.starters[pos]);
+    return list.find((p) => p.name === identity.name) || null;
   }
 
-  // ---------- container + top-level render ----------
+  // Re-locates the tap-selected player (if any) among the cards render()
+  // JUST rebuilt, and re-applies the dim + tooltip there -- see state.js's
+  // comment on state.selectedIdentity for why this exists: render() tears
+  // down and rebuilds every `.fxm-card` node on every re-render, and this
+  // livescoring page's own DOM mutations trigger that rebuild often (a
+  // MutationObserver in main.js reacts to Fantrax's live score updates),
+  // including while a player is tap-selected. Without this, the dimming
+  // and tooltip would revert to "nothing selected" within ~1s of a tap --
+  // reads as the selection mysteriously undoing itself, even though the
+  // user didn't touch anything.
+  //
+  // Found: re-select + re-dim (setSelectedCard), then re-render the
+  // tooltip's content AND re-anchor/re-track it via showTooltipForCard --
+  // reusing that function (rather than only repositioning) means the
+  // scroll-tracker's targetEl also gets updated to the new node, and the
+  // stat lines reflect this render's freshest data, exactly as if the user
+  // had just tapped the new card themselves.
+  //
+  // Not found (player genuinely no longer in the lineup/data at all -- a
+  // real edge case, e.g. a sub) -- close the tooltip and clear the
+  // identity, same as any other stale-target close (mirrors
+  // FXShared.trackAnchor's onStale handling for the scroll path).
+  function reapplySelection(data, root) {
+    const identity = state.selectedIdentity;
+    if (!identity) return;
+    const match = qa('.fxm-card', root).find(
+      (c) => c.dataset.side === identity.side && (c.dataset.bench === '1') === identity.isBench && c.dataset.name === identity.name
+    );
+    const p = match && findPlayerByIdentity(data, identity);
+    if (!match || !p) {
+      hideTooltip();
+      return;
+    }
+    setSelectedCard(match);
+    showTooltipForCard(buildTooltipLines(p), match);
+  }
 
   function ensureContainer() {
     if (state.container && document.body.contains(state.container)) return state.container;
@@ -592,7 +893,12 @@
     const data = FXM.parseMatchup();
     if (!data) {
       // Mobile matchup LIST view, or Teams/Scores tabs -- remove our
-      // container silently rather than showing a stale/empty pitch.
+      // container silently rather than showing a stale/empty pitch. Also
+      // close any open tooltip/selection (hideTooltip clears
+      // state.selectedIdentity via clearSelectedCard) -- the tooltip lives
+      // at document.body, not inside state.container, so it wouldn't
+      // otherwise be cleaned up by the container removal above.
+      hideTooltip();
       if (state.container) {
         state.container.remove();
         state.container = null;
@@ -609,14 +915,18 @@
     const body = el('div', 'fxm-body');
     body.style.display = state.hidden ? 'none' : '';
     // DOM order matches the wide-layout reading order (home header, away
-    // header, field, bench) -- matchup.css's grid-template-areas reorders
-    // these visually at the narrow breakpoint without any JS branching here.
-    body.appendChild(renderTeamHeader(data.home, 'fxm-team-header--home'));
-    body.appendChild(renderTeamHeader(data.away, 'fxm-team-header--away'));
+    // header, field, home bench, away bench) -- matchup.css's
+    // grid-template-areas reorders these visually at the narrow breakpoint
+    // (each bench moves next to its own team's header) without any JS
+    // branching here.
+    body.appendChild(renderTeamHeader(data.home, 'fxm-team-header--home', 'home'));
+    body.appendChild(renderTeamHeader(data.away, 'fxm-team-header--away', 'away'));
     body.appendChild(renderField(data));
-    body.appendChild(renderBenchBar(data));
+    body.appendChild(renderBenchSide(data.home.reserves, 'fxm-bench--home', 'home'));
+    body.appendChild(renderBenchSide(data.away.reserves, 'fxm-bench--away', 'away'));
     container.appendChild(body);
     state.bodyEl = body;
+    reapplySelection(data, body);
     requestAnimationFrame(() => applyNameMarquee(body));
   }
 

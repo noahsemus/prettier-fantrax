@@ -35,17 +35,9 @@
   overflow-wrap: break-word;
 }
 
-/* Colored (+N)/(-N) points span inside a hybrid stat line -- see
-   tooltip.js's renderTipLine(). Also reused by action-menu.js's
-   buildStatsSection, which shares this stylesheet on the roster page. */
-.fx-tip-pts--pos {
-  color: #5be08a;
-}
-
-.fx-tip-pts--neg {
-  color: #ff8a80;
-}
-
-.fx-tip-pts--zero {
-  color: #aeb8c4;
-}
+/* Colored (+N)/(-N) points span inside a hybrid stat line -- built by
+   FXShared.renderStatLine (src/shared/touch-overlay.js), classed
+   `fxs-stat-pts fxs-stat-pts--pos|neg|zero` and styled once in
+   src/shared/touch-overlay.css. Was `.fx-tip-pts--*` here; removed in
+   favor of the shared classes (also used by matchup's tooltip) so the
+   color values can't drift between the two features again. */

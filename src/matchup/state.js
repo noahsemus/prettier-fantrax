@@ -40,6 +40,27 @@ window.FXM = window.FXM || {};
     // synthetic per-card key -- matchup cards have no such key today)
     lastMouseX: 0,
     lastMouseY: 0,
+    // Card element the tooltip is anchored to when opened via touch (tap),
+    // vs. the desktop mouse path which tracks the cursor via lastMouseX/Y
+    // instead and never sets this. Set on tap-open, cleared on hide -- see
+    // render.js's showTooltipForCard/hideTooltip, which register/unregister
+    // this element with FXShared.trackAnchor (src/shared/touch-overlay.js)
+    // to keep the tip stuck to it through scroll.
+    tooltipTargetEl: null,
+
+    // Identity (not a DOM node reference) of the tap-selected player, e.g.
+    // { side: 'home', isBench: false, name: 'Erling Haaland' } -- same
+    // side:isBench:name shape render.js's marqueeKey already keys cards by,
+    // for consistency. render() tears down and rebuilds EVERY `.fxm-card`
+    // node on every re-render (a `tooltipTargetEl` DOM reference alone goes
+    // stale the instant that happens), and this page's live-score updates
+    // trigger that MutationObserver-driven rebuild often -- sometimes well
+    // under a second after a tap. Tracking identity instead of a node lets
+    // render() re-locate the SAME player's freshly-built card after a
+    // rebuild and re-apply the dim/tooltip there, so a live-score-driven
+    // re-render doesn't read to the user as their selection reverting. Set
+    // by setSelectedCard, cleared by clearSelectedCard -- see render.js.
+    selectedIdentity: null,
   };
 
   FXM.qa = function qa(sel, root) {
