@@ -1,7 +1,7 @@
 import Capacitor
 import WebKit
 
-/// Injects the Fantrax Refinements bundle (`injected.js`) into the remote
+/// Injects the Prettier Fantrax bundle (`injected.js`) into the remote
 /// fantrax.com page loaded in the Capacitor WebView.
 ///
 /// Implementation notes:

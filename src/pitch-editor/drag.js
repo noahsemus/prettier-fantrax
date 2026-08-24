@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Pitch Editor: drag / click-to-select interactions
+ * Prettier Fantrax -- Pitch Editor: drag / click-to-select interactions
  * ---------------------------------------------------------------------
  * A "source" player becomes active either by starting a native drag, by
  * tap-and-hold on a touch device, or by choosing "Start Swap" from a

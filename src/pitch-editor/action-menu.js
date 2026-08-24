@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Pitch Editor: per-player action menu
+ * Prettier Fantrax -- Pitch Editor: per-player action menu
  * ---------------------------------------------------------------------
  * Clicking a player opens a small menu instead of immediately arming a
  * swap. "Start Swap" reuses the existing arm/highlight flow; Trade, Drop,

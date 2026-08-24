@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- shared touch/mobile overlay mechanics
+ * Prettier Fantrax -- shared touch/mobile overlay mechanics
  * ---------------------------------------------------------------------
  * The pitch-editor (`FXP`, `fx-*` classes) and matchup (`FXM`, `fxm-*`
  * classes) features each render their own mobile tap-opened overlay (an

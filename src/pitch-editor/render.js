@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Pitch Editor: render the pitch + bench
+ * Prettier Fantrax -- Pitch Editor: render the pitch + bench
  * ---------------------------------------------------------------------
  * This file now loads on every fantrax.com page (see main.js), so render()
  * gates on the roster-only "Easy Click"/"Classic" nav before touching the

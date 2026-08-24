@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Matchup Pitch: boot / keep in sync with live updates
+ * Prettier Fantrax -- Matchup Pitch: boot / keep in sync with live updates
  * ---------------------------------------------------------------------
  * Watches the page for changes (matchup carousel switching to a different
  * matchup, live score refresh, gameweek change) and re-renders. Anything

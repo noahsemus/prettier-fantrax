@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Pitch Editor: shared state + tiny DOM utils
+ * Prettier Fantrax -- Pitch Editor: shared state + tiny DOM utils
  * ---------------------------------------------------------------------
  * Every pitch-editor file is a plain (non-module) script attached in
  * manifest.json, so they share one global scope. Rather than leaning on

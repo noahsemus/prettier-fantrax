@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Pitch Editor: boot / keep in sync with live updates
+ * Prettier Fantrax -- Pitch Editor: boot / keep in sync with live updates
  * ---------------------------------------------------------------------
  * Watches the page for changes (new gameweek, live score refresh, etc.)
  * and re-renders. Anything WE inserted (the pitch container, the injected

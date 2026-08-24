@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Matchup Pitch: shared state + tiny DOM utils
+ * Prettier Fantrax -- Matchup Pitch: shared state + tiny DOM utils
  * ---------------------------------------------------------------------
  * Same pattern as pitch-editor/state.js: every matchup file is a plain
  * (non-module) script attached in manifest.json, so they share one global

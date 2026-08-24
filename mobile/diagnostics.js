@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Mobile: on-page diagnostics badge
+ * Prettier Fantrax -- Mobile: on-page diagnostics badge
  * ---------------------------------------------------------------------
  * fantrax.com is an Angular SPA, and its mobile layout may not carry the
  * same DOM structure the desktop selectors above were written against --

@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Matchup Pitch: parse the livescoring matchup DOM
+ * Prettier Fantrax -- Matchup Pitch: parse the livescoring matchup DOM
  * ---------------------------------------------------------------------
  * Reads the two `.scoring-table` elements Fantrax already renders inside
  * `league-livescoring-standard-table` ([0] = starters, [1] = reserves)
