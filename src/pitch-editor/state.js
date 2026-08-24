@@ -39,6 +39,16 @@ window.FXP = window.FXP || {};
     pointsCacheAt: 0,
     pointsCacheGwKey: null,
     pointsSyncInFlight: false,
+    // gwKey (see points-sync.js's getGameweekNumber) that the most recent
+    // points-sync attempt has already RUN FOR, success or failure -- set in
+    // that file's syncPointsData(), always, no matter how the attempt ends.
+    // render.js shows a loading overlay instead of the field/bench whenever
+    // the CURRENT gwKey has neither a committed cache (pointsCacheGwKey)
+    // nor a finished attempt (this field) yet -- i.e. only for the very
+    // first sync since page load or a gameweek switch, and bounded to at
+    // most one attempt's duration so a sync that never succeeds can't leave
+    // the overlay stuck showing forever.
+    pointsSyncAttemptedGwKey: undefined,
     tooltipEl: null,
     hoveredKey: null,
     lastMouseX: 0,

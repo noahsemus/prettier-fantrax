@@ -42,13 +42,56 @@
   let touchTargetCard = null; // card currently under the finger, if valid
   let suppressNextClick = false; // swallow the synthetic click browsers fire after a touch drag
 
+  // What counts as a legal drop mirrors what Fantrax's own two-click lineup
+  // flow can actually complete (verified live by arming real lineup-btns and
+  // reading the `ineligible` classes + disabled buttons Fantrax puts on
+  // every invalid destination). Two shapes of move exist:
+  //
+  //  - DIRECT: the incoming player is eligible for the exact slot the drop
+  //    lands on (an empty slot, or the slot of the player they displace).
+  //    One arm-click + one destination-click and Fantrax does the rest,
+  //    including bumping the displaced player to the bench itself.
+  //  - TWO-STEP (bench player replacing an active player of a position they
+  //    can't play, e.g. a D-only bench player dropped on an active F): no
+  //    single Fantrax op does this, but the sequence "bench player -> empty
+  //    active slot of their own position, then displaced player -> the
+  //    just-freed bench spot" completes it entirely through Fantrax's own
+  //    controls. Only possible while the formation has an empty active slot
+  //    the incoming player fits -- swap.js runs the sequence.
+  //
+  // Every combination below was verified against the live site; anything our
+  // static rules get wrong is still caught at swap time, because swap.js
+  // refuses to click a destination button Fantrax has disabled.
+  function hasEmptyActiveSlotFor(player) {
+    return state.players.some(
+      (x) => x.isEmpty && !x.isReserve && !x.locked && player.eligiblePositions.includes(x.pos)
+    );
+  }
+
   function isValidDropTarget(source, target) {
     if (!source || !target) return false;
     if (source.key === target.key) return false;
     if (source.locked || target.locked) return false;
-    if (source.pos !== target.pos) return false;
-    if (!target.isEmpty && source.isReserve === target.isReserve) return false;
-    return true;
+    if (source.isEmpty) return false;
+    if (target.isEmpty) {
+      // An empty bench slot only exists mid-shuffle; dropping an active
+      // player there just benches them. Bench -> empty bench is pointless.
+      if (target.isReserve) return !source.isReserve;
+      return source.eligiblePositions.includes(target.pos);
+    }
+    // Bench <-> bench: neither player would become active -- pointless.
+    if (source.isReserve && target.isReserve) return false;
+    if (!source.isReserve && !target.isReserve) {
+      // Active <-> active is a slot change; same slot type changes nothing.
+      if (source.pos === target.pos) return false;
+      return source.eligiblePositions.includes(target.pos);
+    }
+    // Active <-> bench: the bench player is coming in either way. They need
+    // a slot -- the outgoing player's own, or any empty active slot they fit
+    // (the two-step path).
+    const incoming = source.isReserve ? source : target;
+    const outgoing = source.isReserve ? target : source;
+    return incoming.eligiblePositions.includes(outgoing.pos) || hasEmptyActiveSlotFor(incoming);
   }
 
   function highlightValidTargets(source) {

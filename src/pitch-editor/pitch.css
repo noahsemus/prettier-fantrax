@@ -274,3 +274,94 @@
   opacity: 0.95;
   transition: none;
 }
+
+/* ---------- initial-load / gameweek-switch loading state ----------
+   render.js swaps the field+bench for this block (buildLoadingOverlay())
+   for exactly the FIRST points-sync since page load or a gameweek switch --
+   see that file's header comment for the full "why". Reuses the same field
+   gradient (--fx-green-1/2, from .fx-pitch) so the loading state reads as
+   "the same pitch, still settling" rather than a totally different screen,
+   and a min-height roughly matching a typical field+bench so the swap to
+   real cards, once the sync resolves, isn't a big layout jump either. */
+.fx-pitch__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  padding: 20px 14px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--fx-green-1) 0px,
+    var(--fx-green-1) 46px,
+    var(--fx-green-2) 46px,
+    var(--fx-green-2) 92px
+  );
+}
+
+.fx-pitch__spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  animation: fx-pitch-spin 0.8s linear infinite;
+}
+
+.fx-pitch__loading-label {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Card-shaped placeholders hinting at the bench row that's about to
+   render -- same footprint as a real .fx-card (card.css) so there's
+   nothing to reflow around once actual cards take their place. */
+.fx-pitch__skeleton-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.fx-pitch__skeleton-card {
+  width: 88px;
+  height: 92px;
+  border-radius: 8px;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.08) 30%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.08) 70%
+  );
+  background-size: 200% 100%;
+  animation: fx-pitch-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes fx-pitch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fx-pitch-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Respect the OS-level reduced-motion preference -- the loading state is
+   purely decorative feedback, not information conveyed only via motion, so
+   freezing it is a safe no-op rather than a functionality loss. */
+@media (prefers-reduced-motion: reduce) {
+  .fx-pitch__spinner,
+  .fx-pitch__skeleton-card {
+    animation: none;
+  }
+}

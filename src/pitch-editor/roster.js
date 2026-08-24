@@ -75,6 +75,19 @@
     });
   }
 
+  // A player can be eligible for more than one position (e.g. "D,M"), shown
+  // as the first comma-separated span in `.scorer__info__positions` -- this
+  // is DISTINCT from `lineup-btn`'s text, which only shows their CURRENT
+  // slot. Empty slots have no positions element; they're only ever the one
+  // position their row belongs to.
+  function readEligiblePositions(row, pos) {
+    const posEl = row.querySelector('.scorer__info__positions');
+    const firstSpan = posEl && posEl.querySelector('span');
+    const text = firstSpan ? firstSpan.textContent.trim() : '';
+    if (!text) return [pos];
+    return text.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+
   function parseRoster() {
     const rows = getListRows();
     const emptyCounters = {};
@@ -105,6 +118,7 @@
         key: isEmpty ? `empty-${pos}-${isReserve}-${emptyIndex}` : name,
         name,
         pos,
+        eligiblePositions: readEligiblePositions(row, pos),
         isReserve,
         isEmpty,
         emptyIndex,

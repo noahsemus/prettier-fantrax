@@ -160,14 +160,24 @@
 
   async function syncPointsData() {
     if (state.pointsSyncInFlight || state.busy) return;
+    // Captured up front (not just inside the try/finally below) so the two
+    // early-return guards just below can also mark this gwKey as "attempted"
+    // -- see state.pointsSyncAttemptedGwKey's comment in state.js. Without
+    // that, a page that never lays out the tabs/select as expected (or one
+    // stuck with a menu open) would leave render.js's loading overlay
+    // showing indefinitely, since neither guard ever reaches the
+    // try/finally block that normally marks the attempt done.
+    const earlyGwKey = getGameweekNumber();
     const tabs = findStatsTabs();
     const periodSelect = findSelectByLabel('Stats');
     if (!tabs || !periodSelect) {
       state.pointsLastAttemptAt = Date.now(); // page isn't laid out as expected -- skip silently, but don't retry every render
+      state.pointsSyncAttemptedGwKey = earlyGwKey;
       return;
     }
     if (overlayChildCount() > 0) {
       state.pointsLastAttemptAt = Date.now(); // don't fight an already-open menu
+      state.pointsSyncAttemptedGwKey = earlyGwKey;
       return;
     }
 
@@ -267,6 +277,32 @@
       document.documentElement.classList.remove('fx-syncing');
       state.pointsSyncInFlight = false;
       state.busy = false;
+      // Marks this run's gwKey "attempted" no matter how it ended --
+      // render.js's needsInitialSync check (loading overlay) treats a gwKey
+      // as done syncing once it's EITHER committed (state.pointsCacheGwKey)
+      // OR merely attempted (this), so a run that hits Guard 1/2 above, or
+      // throws, still bounds the overlay to this one attempt instead of
+      // leaving it stuck. Set after busy/pointsSyncInFlight are already
+      // cleared, both because it's semantically "this attempt is over" and
+      // because the FXP.render() call below relies on them already being
+      // false.
+      state.pointsSyncAttemptedGwKey = gwKey;
+      // Pitch cards for a not-yet-played player show state.projectedCache
+      // (see render.js's renderCard), and the loading overlay above only
+      // clears once render() actually runs again -- but nothing else
+      // re-renders the pitch on its own (only an unrelated DOM mutation
+      // would trigger main.js's observer). Without this, a gameweek switch
+      // would show blank/stale numbers -- or, on a failed attempt, the
+      // loading overlay -- until the user happens to cause some other
+      // mutation. Re-render now, on every exit from this function
+      // (committed or not), so the result is always shown immediately.
+      // Safe against re-entrancy: this render()'s own end-of-function
+      // maybeSyncPointsData() call sees pointsSyncInFlight already false,
+      // but its backoff check (pointsLastAttemptAt, just set above on a
+      // failed run) or its gwKey-already-cached check (on a committed run,
+      // pointsCacheGwKey now equals gwKey) stop it from re-triggering a
+      // sync synchronously in a loop.
+      if (state.tabActive) FXP.render();
     }
   }
 

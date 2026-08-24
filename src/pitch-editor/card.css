@@ -256,3 +256,52 @@
   color: rgba(255, 255, 255, 0.35);
   pointer-events: none;
 }
+
+/* ---------- per-card swap-in-progress state ----------
+   Applied by swap.js's attemptSwap to just the source and target cards for
+   the ~1-2s a real swap takes clicking through Fantrax's own controls --
+   NOT the whole-pitch overlay pitch.css's .fx-pitch__loading uses for the
+   initial points sync. That overlay means "we don't have anything to show
+   yet"; this means "the data's fine, these two cards are mid-request," so
+   it stays scoped to the two cards actually involved. Dims/desaturates the
+   card and centers a small spinner over it -- reuses pitch.css's
+   `fx-pitch-spin` keyframes (both files load together, so the keyframe
+   name is shared) rather than redefining the same rotation.
+   `.fx-card--empty` is `display: none` by default (only shown mid-drag via
+   `.fx-card--empty-visible`, cleared by drag.js's `dragend` handler on the
+   very next event tick after a drop) -- force it visible here too, since an
+   empty-slot target dropped onto should still show its own loading card for
+   the duration of the swap instead of just disappearing. */
+.fx-card--swapping {
+  position: relative;
+  pointer-events: none;
+  filter: grayscale(0.6);
+  opacity: 0.55;
+}
+
+.fx-card--empty.fx-card--swapping {
+  display: flex;
+}
+
+.fx-card--swapping::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: fx-pitch-spin 0.8s linear infinite;
+}
+
+/* Reduced motion: keep the dim + static ring, drop only the spin -- same
+   policy as pitch.css's own loading state. */
+@media (prefers-reduced-motion: reduce) {
+  .fx-card--swapping::after {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.75);
+  }
+}

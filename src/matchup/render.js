@@ -367,6 +367,38 @@
   // the first line, ahead of the projected/no-stats line -- the dot's
   // `title` attribute never shows on a tap/touch device, so the tooltip is
   // what carries that explanation on mobile.
+  // parse.js's p.points comes from `dl.scoring-table__cell__fpts dd`, which
+  // can disagree with the player's ACTUAL stat breakdown once their game is
+  // live -- confirmed against a real match (Joao Pedro, 3' into a live
+  // game: dd read ~18.4 while Fantrax's own player-card popup showed the
+  // correct live total of 11, exactly matching this file's own breakdown
+  // lines -- Goal +9, Shots on Target +2 -- summed by hand). Rather than
+  // trust dd for a player we already have a proven-accurate per-stat fpts
+  // reading for (window.FXC's fptsMap, the SAME data the breakdown lines
+  // below are built from), derive the displayed total by SUMMING those
+  // contributions instead -- pure arithmetic on data already validated
+  // against the real total, no new DOM selector to get wrong. Falls back to
+  // p.points (dd) only when no fptsMap reading exists yet for this player
+  // (FXC not loaded, or this player not in it) -- same enhancement-layer-
+  // over-fallback pattern the rest of this function already uses. Must NOT
+  // be used for the 'upcoming' (not-yet-played) branches further down --
+  // an unplayed player's fptsMap is empty (nothing scored yet), so summing
+  // it would wrongly zero out p.points there, which legitimately holds
+  // Fantrax's own PROJECTION in that case, not a stale/wrong total.
+  function resolvePoints(p) {
+    const fxc = window.FXC;
+    const fptsMap = fxc && fxc.fpts && fxc.fpts.get(p.name);
+    if (fptsMap && fptsMap.size) {
+      let sum = 0;
+      fptsMap.forEach((v) => {
+        const n = parseFloat(v);
+        if (!isNaN(n)) sum += n;
+      });
+      return String(Math.round(sum * 100) / 100);
+    }
+    return p.points;
+  }
+
   function buildTooltipLines(p) {
     const statNames = window.FX_STAT_NAMES || {};
     const fxc = window.FXC;
@@ -385,7 +417,7 @@
         });
       });
       if (abbrs.length) {
-        const lines = [`${p.points || '0'} pts:`];
+        const lines = [`${resolvePoints(p)} pts:`];
         abbrs.forEach((abbr) => {
           const fullName = statNames[abbr] || abbr;
           const ptsText = fptsMap.get(abbr);
@@ -411,7 +443,7 @@
     if (p.chips && p.chips.size) {
       const buttons = getModeButtons();
       const onFpts = !!(buttons && buttons.fpts.classList.contains('pill--active'));
-      const lines = [`${p.points || '0'} pts:`];
+      const lines = [`${resolvePoints(p)} pts:`];
       p.chips.forEach((value, abbr) => {
         const fullName = statNames[abbr] || abbr;
         lines.push(`${onFpts ? formatSigned(value) : value} ${fullName}`);
@@ -595,7 +627,8 @@
     // muted zero there instead; the projection still surfaces on hover
     // (see buildTooltipLines).
     const isUpcoming = gameState(p.gameText) === 'upcoming';
-    const ptsText = !isUpcoming && p.points && p.points !== '-' ? p.points : '0';
+    const resolvedPoints = isUpcoming ? null : resolvePoints(p);
+    const ptsText = resolvedPoints && resolvedPoints !== '-' ? resolvedPoints : '0';
     const ptsN = parseFloat(ptsText);
     const ptsKind = ptsN > 0 ? 'pos' : ptsN < 0 ? 'neg' : 'zero';
     info.appendChild(el('div', `fxm-card__pts fxm-card__pts--${ptsKind}`, ptsText));

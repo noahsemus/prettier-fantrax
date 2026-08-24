@@ -5,6 +5,33 @@
  * gates on the roster-only "Easy Click"/"Classic" nav before touching the
  * DOM -- otherwise a non-roster page with its own `.i-table` (standings,
  * players lists, ...) would get a stray empty `.fx-pitch` container.
+ *
+ * ---------- initial-load / gameweek-switch loading state ----------
+ * points-sync.js briefly flips Fantrax's real Stats/Fantasy Points tabs
+ * (and the Stats period dropdown) to scrape per-player points/projection
+ * data -- see that file's header comment for why, and how it masks the
+ * flip itself. That masking hides the REAL table's churn, but the pitch
+ * cards render() builds are still visibly affected: the very first render
+ * for a gameweek necessarily uses whatever numbers happen to already be on
+ * the page (no synced cache exists yet), then a couple of seconds later --
+ * once the sync completes -- a second render swaps in the freshly-synced
+ * breakdown/projection numbers. Two renders, same cards, different numbers:
+ * exactly the "ui swapping and numbers updating" a user notices.
+ *
+ * render() avoids that by checking needsInitialSync: true only when the
+ * CURRENTLY DISPLAYED gwKey has neither a committed cache
+ * (state.pointsCacheGwKey) nor a finished sync attempt
+ * (state.pointsSyncAttemptedGwKey) yet -- i.e. only for the very first sync
+ * since page load or a gameweek switch, never for the routine 60s
+ * background resyncs that follow (those only ever run once a gwKey already
+ * has a committed cache, so needsInitialSync is already false by then).
+ * When true, the field+bench are replaced with buildLoadingOverlay()
+ * instead of real cards, and maybeSyncPointsData() is still called to
+ * kick off (or continue) the sync. points-sync.js's syncPointsData()
+ * guarantees state.pointsSyncAttemptedGwKey gets set -- and a follow-up
+ * render() triggered -- on every exit path, success or failure, so this
+ * can never get stuck showing the overlay: worst case, it clears the
+ * instant that one sync attempt finishes.
  * ---------------------------------------------------------------------
  */
 (function (FXP) {
@@ -82,6 +109,39 @@
     return marks;
   }
 
+  // ---------- initial-load / gameweek-switch loading overlay ----------
+  // Stands in for the field+bench while needsInitialSync is true (see this
+  // file's header comment). Roughly mirrors the real layout's shape -- a
+  // green field block plus a row of card-sized placeholders -- so swapping
+  // it out for the actual cards, once the sync settles, isn't itself a big
+  // layout jump. Lives inside `container` (appended alongside the header,
+  // same as the real field/bench), so it stays covered by main.js's
+  // isOwnMutation() check without needing any OWN_BODY_CLASSES entry.
+  function buildLoadingOverlay() {
+    const loading = document.createElement('div');
+    loading.className = 'fx-pitch__loading';
+
+    const spinner = document.createElement('div');
+    spinner.className = 'fx-pitch__spinner';
+    loading.appendChild(spinner);
+
+    const label = document.createElement('div');
+    label.className = 'fx-pitch__loading-label';
+    label.textContent = 'Loading lineup…';
+    loading.appendChild(label);
+
+    const skeletonRow = document.createElement('div');
+    skeletonRow.className = 'fx-pitch__skeleton-row';
+    for (let i = 0; i < 5; i++) {
+      const card = document.createElement('div');
+      card.className = 'fx-pitch__skeleton-card';
+      skeletonRow.appendChild(card);
+    }
+    loading.appendChild(skeletonRow);
+
+    return loading;
+  }
+
   function ensureContainer() {
     if (state.container && document.body.contains(state.container)) return state.container;
     const anchor = document.querySelector('.i-table');
@@ -114,7 +174,6 @@
     state.dragSource = null;
     state.players = players;
     state.cardsByKey = new Map();
-    const jerseyMap = buildJerseyMap();
 
     const header = document.createElement('div');
     header.className = 'fx-pitch__header';
@@ -127,6 +186,21 @@
     header.appendChild(status);
     container.appendChild(header);
     state.statusEl = status;
+
+    // See the "initial-load / gameweek-switch loading state" block in this
+    // file's header comment. gwKey is read defensively (FXP.getGameweekNumber
+    // is defined by points-sync.js, which loads AFTER this file -- safe at
+    // call time since render() only ever runs once the page is live, but
+    // guard anyway in case load order ever changes).
+    const gwKey = FXP.getGameweekNumber ? FXP.getGameweekNumber() : null;
+    const needsInitialSync = gwKey !== state.pointsCacheGwKey && gwKey !== state.pointsSyncAttemptedGwKey;
+    if (needsInitialSync) {
+      container.appendChild(buildLoadingOverlay());
+      FXP.maybeSyncPointsData(); // kick off (or continue) the sync that will clear this overlay
+      return;
+    }
+
+    const jerseyMap = buildJerseyMap();
 
     const field = document.createElement('div');
     field.className = 'fx-pitch__field';
@@ -315,12 +389,27 @@
       name.appendChild(nameInner);
       info.appendChild(name);
 
-      if (p.fptsText && p.fptsText !== '-') {
+      // For a player who hasn't played in the CURRENTLY VIEWED gameweek --
+      // whether that's a future gameweek picked from the Gameweek selector,
+      // or the current one pre-kickoff -- p.fptsText reflects whatever
+      // Fantrax's own FPts column shows for that (unplayed) week, which
+      // isn't a meaningful "points" figure yet. Prefer the background-
+      // synced projection (points-sync.js's state.projectedCache, already
+      // keyed to the currently-selected gameweek via pointsCacheGwKey) when
+      // one's available, so switching to a future gameweek shows THAT
+      // week's projected points instead of a stale/blank number left over
+      // from whatever was last on screen.
+      let fptsText = p.fptsText;
+      if (!p.locked && state.projectedCache) {
+        const projected = state.projectedCache.get(p.name);
+        if (projected !== undefined && projected !== null && projected !== '-') fptsText = projected;
+      }
+      if (fptsText && fptsText !== '-') {
         const fpts = document.createElement('div');
-        const n = parseFloat(p.fptsText);
+        const n = parseFloat(fptsText);
         const kind = n > 0 ? 'pos' : n < 0 ? 'neg' : 'zero';
         fpts.className = `fx-card__fpts fx-card__fpts--${kind}`;
-        fpts.textContent = p.fptsText;
+        fpts.textContent = fptsText;
         info.appendChild(fpts);
       }
 
@@ -350,6 +439,7 @@
 
   FXP.buildJerseyMap = buildJerseyMap;
   FXP.jerseyFromCrest = jerseyFromCrest;
+  FXP.buildLoadingOverlay = buildLoadingOverlay;
   FXP.ensureContainer = ensureContainer;
   FXP.buildPitchMarks = buildPitchMarks;
   FXP.render = render;
