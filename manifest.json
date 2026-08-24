@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Fantrax Refinements",
+  "version": "1.0.0",
+  "description": "Small UX tweaks for Fantrax: stat tooltips + Fpts default in live scoring, and a drag-and-drop pitch editor for setting your lineup.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.fantrax.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.fantrax.com/fantasy/league/*/team/roster*"],
+      "js": ["pitch-editor.js"],
+      "css": ["pitch-editor.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

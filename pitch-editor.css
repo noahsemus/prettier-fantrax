@@ -1,0 +1,266 @@
+.fx-pitch {
+  --fx-green-1: #1e6b3a;
+  --fx-green-2: #268049;
+  --fx-line: rgba(255, 255, 255, 0.55);
+  margin: 12px 0 18px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.fx-pitch__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0e1116;
+  padding: 8px 14px;
+  color: #f5f7fa;
+  font-size: 13px;
+}
+
+.fx-pitch__title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.fx-pitch__status {
+  font-size: 12px;
+  color: #aeb8c4;
+  min-height: 16px;
+  transition: color 0.2s ease;
+}
+
+.fx-pitch__status--ok {
+  color: #5be08a;
+}
+
+.fx-pitch__status--err {
+  color: #ff8a80;
+}
+
+.fx-pitch__field {
+  position: relative;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--fx-green-1) 0px,
+    var(--fx-green-1) 46px,
+    var(--fx-green-2) 46px,
+    var(--fx-green-2) 92px
+  );
+  padding: 18px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fx-pitch__field::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 2px solid var(--fx-line);
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.fx-pitch__row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+
+.fx-bench {
+  background: #14181f;
+  padding: 12px 14px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fx-bench__label {
+  color: #9aa4b2;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.fx-bench__row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fx-card {
+  width: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: grab;
+  user-select: none;
+  border-radius: 8px;
+  padding: 5px 4px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.fx-card:hover:not(.fx-card--locked):not(.fx-card--empty) {
+  background: rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
+}
+
+.fx-card--locked {
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+
+.fx-card--empty {
+  cursor: default;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  min-height: 78px;
+  justify-content: center;
+}
+
+.fx-card--dragging {
+  opacity: 0.35;
+}
+
+.fx-card--armed {
+  border-color: #ffd166;
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.35);
+  background: rgba(255, 209, 102, 0.1);
+}
+
+.fx-card--drop-target {
+  border-color: #5be08a;
+  box-shadow: 0 0 0 2px rgba(91, 224, 138, 0.4);
+  background: rgba(91, 224, 138, 0.12);
+}
+
+.fx-card__crest {
+  width: auto;
+  height: 46px;
+  max-width: 52px;
+  object-fit: contain;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+}
+
+.fx-card__pos {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 8px;
+  font-weight: 700;
+  color: #0e1116;
+  background: rgba(245, 247, 250, 0.9);
+  border-radius: 3px;
+  padding: 0 3px;
+  pointer-events: none;
+}
+
+.fx-card {
+  position: relative;
+}
+
+.fx-card__name {
+  font-size: 10.5px;
+  color: #fff;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  margin-top: 1px;
+}
+
+.fx-card__fpts {
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+  margin-top: 1px;
+}
+
+.fx-card__fpts--pos {
+  color: #ffd166;
+}
+
+.fx-card__fpts--neg {
+  color: #ff8a80;
+}
+
+.fx-card__fpts--zero {
+  color: #aeb8c4;
+}
+
+.fx-card__opp {
+  font-size: 8.5px;
+  color: #cfe0ea;
+  opacity: 0.75;
+  text-align: center;
+  line-height: 1.25;
+  max-width: 86px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  margin-top: 2px;
+}
+
+.fx-card__plus {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+
+.fx-pitch__hint {
+  padding: 6px 14px 10px;
+  background: #14181f;
+  color: #7c8794;
+  font-size: 11px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.fx-list-collapsed {
+  display: none !important;
+}
+
+/* The "Pitch Editor" tab injected next to Fantrax's own "Easy Click" /
+   "Classic" pills. Styled to match rather than relying on their
+   (possibly view-encapsulated) CSS actually applying to a node we
+   inserted ourselves. */
+.fx-pitch-tab {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #cfd6de;
+  background: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fx-pitch-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.fx-pitch-tab--active {
+  background: #1e6b3a;
+  color: #fff;
+}
+
+.fx-pitch-tab--active:hover {
+  background: #1e6b3a;
+}
