@@ -1639,7 +1639,12 @@ window.FXP = window.FXP || {};
  * each breakdown line leads with the raw count, followed by the stat name,
  * then the signed points contribution in parentheses, e.g. "4 Saves (+2)"
  * -- falling back to the points-only form if a raw count isn't cached for
- * that stat yet.
+ * that stat yet. For a not-yet-played player who also has a pre-kickoff
+ * status dot (p.eventStatus, roster.js's FXP.EVENT_STATUS_LABEL), the
+ * dot's own explanation (e.g. "Not expected to play") is prepended as the
+ * first line, ahead of the projection line -- the dot's `title` attribute
+ * never shows on a tap/touch device, so the tooltip is what carries that
+ * explanation on mobile.
  *
  * buildTooltipLines(p) returns an array whose entries are either a plain
  * string (title/loading/projection/fallback lines, rendered via
@@ -1739,10 +1744,18 @@ window.FXP = window.FXP || {};
       });
       return lines;
     }
+    // A player with an eventStatus (only ever set pre-kickoff -- see
+    // roster.js's readEventStatus) has a colored status dot next to their
+    // name on the list, but the dot's only explanation is an HTML `title`
+    // attribute, which never shows on a tap/touch device. Prepend its label
+    // (e.g. "Not expected to play") as its own line here so the tooltip
+    // itself carries that explanation on mobile too, ahead of the
+    // projection line below.
+    const statusLine = p.eventStatus ? [FXP.EVENT_STATUS_LABEL[p.eventStatus]] : [];
     const proj = state.projectedCache.get(p.name);
-    if (proj === undefined) return ['Projected points not available yet'];
+    if (proj === undefined) return [...statusLine, 'Projected points not available yet'];
     const gw = FXP.getGameweekNumber();
-    return [`Projected: ${proj} pts${gw ? ` (Gameweek ${gw})` : ''}`];
+    return [...statusLine, `Projected: ${proj} pts${gw ? ` (Gameweek ${gw})` : ''}`];
   }
 
   FXP.ensureCardTip = ensureCardTip;
@@ -3109,6 +3122,14 @@ window.FXM = window.FXM || {};
   // (FXShared.renderStatLine's `{ text, pts }` shape -- green positive /
   // red negative / muted zero). Degrades to whichever single value is
   // known when only one side is available (no parenthetical, plain text).
+  //
+  // For a not-yet-played ('upcoming', and the 'unknown' best-effort
+  // fallback right after it) player who also has a pre-kickoff status dot
+  // (p.eventStatus, this file's own EVENT_STATUS_LABEL copy above), the
+  // dot's own explanation (e.g. "Not expected to play") is prepended as
+  // the first line, ahead of the projected/no-stats line -- the dot's
+  // `title` attribute never shows on a tap/touch device, so the tooltip is
+  // what carries that explanation on mobile.
   function buildTooltipLines(p) {
     const statNames = window.FX_STAT_NAMES || {};
     const fxc = window.FXC;
@@ -3168,15 +3189,28 @@ window.FXM = window.FXM || {};
     // them not featuring at all.
     const state = gameState(p.gameText);
     if (state === 'upcoming') {
-      if (p.points && p.points !== '-') return [`Projected: ${p.points} pts`];
-      return ["No stats yet — hasn't played"];
+      // A player with an eventStatus (only ever set pre-kickoff -- see
+      // parse.js/roster.js's readEventStatus) has a colored status dot next
+      // to their name, but the dot's only explanation is an HTML `title`
+      // attribute, which never shows on a tap/touch device. Prepend its
+      // label (e.g. "Not expected to play") as its own line here so the
+      // tooltip itself carries that explanation on mobile too, ahead of the
+      // projected/no-stats line below.
+      const statusLine = p.eventStatus ? [EVENT_STATUS_LABEL[p.eventStatus]] : [];
+      if (p.points && p.points !== '-') return [...statusLine, `Projected: ${p.points} pts`];
+      return [...statusLine, "No stats yet — hasn't played"];
     }
     if (state === 'finished') {
       return ['Did not play this gameweek'];
     }
-    // unknown -- best effort, same as before this distinction existed.
-    if (p.points && p.points !== '-') return [`Projected: ${p.points} pts`];
-    return ["No stats yet — hasn't played"];
+    // unknown -- best effort, same as before this distinction existed. Same
+    // eventStatus prepend as the 'upcoming' branch above, for consistency --
+    // in practice a player with eventStatus set is always classified
+    // 'upcoming', but this branch duplicates the same projected/no-stats
+    // logic so it gets the same treatment rather than silently diverging.
+    const statusLine = p.eventStatus ? [EVENT_STATUS_LABEL[p.eventStatus]] : [];
+    if (p.points && p.points !== '-') return [...statusLine, `Projected: ${p.points} pts`];
+    return [...statusLine, "No stats yet — hasn't played"];
   }
 
   function attachHoverTooltip(card, p) {
