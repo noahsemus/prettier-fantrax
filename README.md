@@ -1,5 +1,126 @@
 # Fantrax Refinements (Chrome extension)
 
+## How to install
+
+Pick your device. (What the extension actually does is described in the
+next section.)
+
+### On a computer -- Chrome (easiest)
+
+Works in Chrome and Chrome-based browsers (Edge, Brave, Arc, ...).
+
+1. Download this repo: on the GitHub page, click the green **Code**
+   button, then **Download ZIP**, and unzip it somewhere permanent.
+   (Chrome loads the extension straight from this folder every time, so
+   don't delete or move it afterwards.)
+2. In Chrome, open a new tab and go to `chrome://extensions`.
+3. Turn on **Developer mode** (toggle in the top-right corner).
+4. Click **Load unpacked** (top-left) and select the unzipped folder --
+   the one that contains `manifest.json`.
+5. Open (or refresh) fantrax.com. That's it -- the tweaks apply
+   automatically on any `https://www.fantrax.com/*` page.
+
+No permissions beyond running on fantrax.com are requested, and nothing
+is sent off the page -- it's a pure content script.
+
+To update later: download the new ZIP, replace the folder's contents,
+and click the refresh icon on the extension's card in
+`chrome://extensions`.
+
+### On an iPhone (free -- no Apple Developer account)
+
+Apple doesn't let iPhones install apps from a link unless the developer
+pays for a $99/yr Apple Developer account. Without one, the only way is
+to build the app yourself and "sideload" it with a cable. It's genuinely
+free, but two catches: **you need a Mac with Xcode**, and **the app
+expires after 7 days** -- plugging the phone back in and pressing Run
+again re-signs it for another 7 days.
+
+What you need: a Mac, a free Apple ID, your iPhone + a USB cable.
+
+1. On the Mac, install **Xcode** (free, Mac App Store -- it's big) and
+   **Node.js** (free, from [nodejs.org](https://nodejs.org)).
+2. Download this repo (green **Code** button → **Download ZIP** → unzip),
+   or `git clone` it.
+3. Open Terminal, `cd` into the repo's `mobile/` folder, and run:
+
+   ```
+   npm install
+   npm run build
+   npx cap open ios
+   ```
+
+   The last command opens the iOS project in Xcode.
+4. In Xcode, sign in with your Apple ID: **Xcode → Settings → Accounts
+   → "+" → Apple ID**.
+5. In the left sidebar click the blue **App** project, select the
+   **App** target, open the **Signing & Capabilities** tab, tick
+   **Automatically manage signing**, and pick your **Personal Team**
+   from the Team dropdown. (If Xcode complains the bundle identifier is
+   taken, change it to anything unique, e.g. add your name to it.)
+6. Plug in the iPhone, unlock it, and tap **Trust This Computer**. Then
+   pick your iPhone from the device dropdown at the top of the Xcode
+   window (where it says a simulator name by default).
+7. On the iPhone, turn on Developer Mode: **Settings → Privacy &
+   Security → Developer Mode → on** (the phone restarts). This option
+   only appears once Xcode has seen the phone at least once.
+8. Press the **▶ Run** button in Xcode. The first time, the iPhone will
+   block the app until you trust yourself as a developer: **Settings →
+   General → VPN & Device Management →** tap your Apple ID **→ Trust**.
+   Then run it again from Xcode.
+9. Open the app on the phone and log in to Fantrax once -- the session
+   persists from then on.
+
+When it expires (7 days): plug the phone back into the Mac and press
+**▶ Run** in Xcode again. Your login inside the app survives. (Free
+Apple IDs are also limited to 3 sideloaded apps on a phone at a time.)
+
+**Giving this to iPhone-owning friends:** there is unfortunately no
+"here's a link" option without the paid account. Each friend's phone has
+to go through steps 6-9 while plugged into a Mac -- yours works fine
+(your one Apple ID can sign for their device too), but the 7-day expiry
+means they'd need to come back weekly. For anything less hands-on,
+TestFlight (which *is* a tap-a-link install) requires the $99/yr
+account. Friends on Android are much easier -- see below.
+
+### On an Android phone
+
+Android allows installing apps from a plain file, so you build the APK
+once and can then share it with anyone.
+
+1. Install **Node.js** ([nodejs.org](https://nodejs.org)) and **Android
+   Studio** ([developer.android.com/studio](https://developer.android.com/studio))
+   on any computer.
+2. Download this repo (green **Code** button → **Download ZIP** → unzip),
+   or `git clone` it.
+3. In a terminal, `cd` into the repo's `mobile/` folder and run:
+
+   ```
+   npm install
+   npm run build
+   npx cap open android
+   ```
+
+   The last command opens the project in Android Studio (first launch
+   downloads the Android SDK -- let it finish).
+4. In Android Studio: **Build → Build App Bundle(s) / APK(s) → Build
+   APK(s)**. When it finishes, the APK is at
+   `mobile/android/app/build/outputs/apk/debug/app-debug.apk`.
+5. Get that file onto the phone any way you like -- message it, email
+   it, or upload it somewhere and send the link (a GitHub release works
+   well). On the phone, tap the file and allow **Install unknown apps**
+   when prompted. Done.
+
+(Alternatively, plug your own phone in with USB debugging enabled and
+press **▶ Run** in Android Studio to install it directly.)
+
+**Heads-up on both phone versions:** the mobile app is at Phase 1 -- the
+shell works and the scripts load, but the features were built against
+Fantrax's desktop layout and may not fully work on the mobile site yet.
+See [Mobile app](#mobile-app) below for details.
+
+## What it does
+
 Two small tweaks for `fantrax.com`, built for the Live Scoring page:
 
 1. **Simple-view stat tooltips.** Hovering a stat abbreviation (KP, INT,
@@ -154,18 +275,6 @@ once the page actually runs, not while the files are loading).
   that player's hidden list row -- same "drive the real control"
   approach as everything else here.
 
-## Install (unpacked, dev mode)
-
-1. Unzip this folder somewhere on disk.
-2. In Chrome, go to `chrome://extensions`.
-3. Turn on **Developer mode** (top right).
-4. Click **Load unpacked** and select the unzipped `fantrax-ext` folder.
-5. Open/refresh your Fantrax live scoring page -- the tweaks apply
-   automatically on `https://www.fantrax.com/*`.
-
-No permissions beyond running on fantrax.com are requested, and nothing
-is sent off the page -- it's a pure content script.
-
 ## Mobile app
 
 Chrome for Android/iOS doesn't support extensions, so there's no way to
@@ -190,18 +299,11 @@ that's Phase 2.
 
 ### Build/run
 
-Prereqs: Node, plus Xcode for iOS or Android Studio for Android.
-
-```
-cd mobile && npm install && npm run build
-```
-
-This runs `node build-inject.js && npx cap sync` -- bundling `src/` for
-the WebView and syncing it into the native projects.
-
-- **iOS:** `npx cap open ios`, then run it on your iPhone from Xcode.
-  Sideloading with a free Apple ID works, but the app needs to be
-  re-signed every 7 days; a paid Apple Developer account ($99/yr)
-  stretches that to a year.
-- **Android:** `npx cap open android`, then build/run on your device
-  from Android Studio -- or build the APK and sideload it directly.
+Step-by-step install instructions are in [How to
+install](#how-to-install) at the top. For development, the short
+version: `cd mobile && npm install && npm run build` runs
+`node build-inject.js && npx cap sync` -- bundling `src/` for the
+WebView and syncing it into the native projects -- then
+`npx cap open ios` / `npx cap open android` opens the native project to
+run from Xcode or Android Studio. Re-run `npm run build` after any
+change to `src/`.
