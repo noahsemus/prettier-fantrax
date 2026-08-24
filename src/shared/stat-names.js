@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- shared stat abbreviation dictionary
+ * Prettier Fantrax -- shared stat abbreviation dictionary
  * ---------------------------------------------------------------------
  * Abbreviation -> full name, scraped from Fantrax's own Classic-view
  * header tooltips so it stays accurate to this league's stat set.

@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements
+ * Prettier Fantrax
  * ---------------------------------------------------------------------
  * 1) In "Simple" (Standard) live-scoring view, hovering a stat abbreviation
  *    (KP, INT, TkW, ...) shows a tooltip with what it stands for -- the

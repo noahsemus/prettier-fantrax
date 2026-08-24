@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Pitch Editor: read the real roster list
+ * Prettier Fantrax -- Pitch Editor: read the real roster list
  * ---------------------------------------------------------------------
  * The pitch/bench view is never a separate source of truth -- it's built
  * fresh from Fantrax's own `.i-table__row` list every render, using that

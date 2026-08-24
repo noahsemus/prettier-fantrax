@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Pitch Editor: hover tooltip
+ * Prettier Fantrax -- Pitch Editor: hover tooltip
  * ---------------------------------------------------------------------
  * How a player got their points (a breakdown by scoring stat), or their
  * projection for the gameweek if they haven't played yet. Data comes from

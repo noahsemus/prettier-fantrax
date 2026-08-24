@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Pitch Editor: "Pitch Editor" tab next to Easy Click / Classic
+ * Prettier Fantrax -- Pitch Editor: "Pitch Editor" tab next to Easy Click / Classic
  * ---------------------------------------------------------------------
  * Injects a third pill into Fantrax's real "Lineup change system" nav so
  * switching to/from the pitch view behaves exactly like switching between

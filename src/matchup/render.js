@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Matchup Pitch: render the two-team pitch
+ * Prettier Fantrax -- Matchup Pitch: render the two-team pitch
  * ---------------------------------------------------------------------
  * Builds one full-pitch layout (both teams' starting lineups facing each
  * other, my team's half nearest their own goal at the outer edge) plus a

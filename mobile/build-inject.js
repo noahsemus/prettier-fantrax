@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Mobile: build the single injected bundle
+ * Prettier Fantrax -- Mobile: build the single injected bundle
  * ---------------------------------------------------------------------
  * The Capacitor shell has no manifest.json / content_scripts mechanism --
  * it just needs one script + one stylesheet to hand to the WebView. This

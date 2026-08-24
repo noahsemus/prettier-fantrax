@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Pitch Editor: swap execution against the real Fantrax controls
+ * Prettier Fantrax -- Pitch Editor: swap execution against the real Fantrax controls
  * ---------------------------------------------------------------------
  * A swap is: click the source player's `lineup-btn`, wait, click the
  * target's `lineup-btn`, wait, then re-read the list to see if the

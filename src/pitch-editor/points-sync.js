@@ -1,5 +1,5 @@
 /**
- * Fantrax Refinements -- Pitch Editor: background scrape for points breakdown + projections
+ * Prettier Fantrax -- Pitch Editor: background scrape for points breakdown + projections
  * ---------------------------------------------------------------------
  * Fantrax's own roster table can show either raw stat counts, each stat's
  * Fantasy Points contribution, or a points *projection* -- but only one at
