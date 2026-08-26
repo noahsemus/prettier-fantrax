@@ -768,11 +768,23 @@
   // projection). Returns null when the matchup isn't finished, or when
   // either total isn't a number we can compare, so callers render no chip
   // at all rather than a wrong or empty one.
+  // Only STARTERS decide a matchup -- reserves don't score in Fantrax, so a
+  // bench player with a later kickoff doesn't keep the result open. Note
+  // parse.js's own shape: starters are bucketed by position ({G,D,M,F}),
+  // reserves are a flat list; there is no combined `players` array.
+  function startersOf(side) {
+    const buckets = (side && side.starters) || {};
+    return Object.keys(buckets).reduce((acc, pos) => acc.concat(buckets[pos] || []), []);
+  }
+
   function matchupResult(data) {
-    const sides = [data.home, data.away];
-    const players = sides.reduce((acc, s) => acc.concat((s && s.players) || []), []);
+    const players = startersOf(data.home).concat(startersOf(data.away));
     if (!players.length) return null;
-    if (players.some((p) => gameState(p.gameText) === 'upcoming')) return null;
+    // Every starter's game must be POSITIVELY finished. Testing for the
+    // absence of 'upcoming' instead would call a matchup done while games
+    // were still in progress: a kicked-off game shows a score with no
+    // trailing "F" and no clock time, which gameState reports as 'unknown'.
+    if (!players.every((p) => gameState(p.gameText) === 'finished')) return null;
 
     const homeScore = parseFloat(data.home.header.live);
     const awayScore = parseFloat(data.away.header.live);

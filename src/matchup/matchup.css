@@ -1019,13 +1019,26 @@
      edge. */
   .fxm-team-header {
     display: grid;
-    grid-template-columns: auto 1fr;
+    /* Third column exists solely for the W/L/D chip on the name's own row.
+       Without a named area of its own the chip is an UNPLACED grid item
+       (`.fxm-team-header__top` is `display: contents` here, so the chip is
+       promoted to a direct grid item just like `__logo`/`__name`) and
+       auto-flow drops it into a new row underneath the projected score --
+       which is exactly what it did before this rule existed. `owner` and
+       `scores` span the last two columns so only the name row is split. */
+    grid-template-columns: auto 1fr auto;
     grid-template-areas:
-      "logo name"
-      "logo owner"
-      "logo scores";
+      "logo name   result"
+      "logo owner  owner"
+      "logo scores scores";
     column-gap: 10px;
     align-items: center;
+  }
+
+  .fxm-team-header__result {
+    grid-area: result;
+    /* Hugs the name rather than stretching across the auto column. */
+    justify-self: end;
   }
 
   .fxm-team-header__top {
