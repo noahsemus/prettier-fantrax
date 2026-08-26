@@ -247,12 +247,34 @@ collapses it whenever you'd rather have the plain tables.
   -- marquees back and forth instead of truncating.
 - **Team crests** appear next to each side's total score in the
   matchup header.
+- **A W/L/D chip** next to each team name once a matchup is finished --
+  Fantrax shows no result indicator of its own, leaving you to compare
+  two decimals. It only appears once every player's game has actually
+  been played, so a side leading mid-gameweek is never labelled a
+  winner.
 - **Responsive.** On a wide screen the pitch is horizontal (home left,
   away right); on a narrow one it rotates vertical (home top, away
   bottom) -- same information, phone-friendly shape.
 - **Live.** It re-renders itself whenever the page's live scores
   refresh, the gameweek changes, or you flip the matchup carousel to a
   different head-to-head.
+
+### Warns you when a starter isn't actually starting
+
+Real lineups publish about an hour before kickoff. If a player in your
+active lineup has been benched or left out by their real club, this
+says so -- a banner on the pitch, plus a desktop notification in
+Chrome (and a local notification in the mobile app).
+
+Fantrax already knows this; it puts a small status icon on every
+player row. The point is that you no longer have to notice a colored
+dot on the right player at the right moment.
+
+**The limit worth knowing:** with no server involved, something has to
+be running to notice. The notification fires when a Fantrax tab is
+open in Chrome, or the app is open on your phone. Alerts arriving with
+everything closed would need a backend polling on your behalf, which
+this project doesn't have.
 
 ### Follows Fantrax's own light/dark theme
 
@@ -306,6 +328,8 @@ src/
                          endpoint -- see the note at the top of this README
     last5.js             "recent performances" lookup + session cache, shared
                          by both pitches (one league-wide player lookup total)
+    lineup-alerts.js     detects a starter benched/left out by their real club,
+                         and delivers the warning (banner + notification)
   content/               Live Scoring: hybrid stat tooltips + Fpts default
     content.js
     content.css
@@ -330,6 +354,9 @@ src/
                            plus stats + recent performances on touch)
     main.js                boot + MutationObserver to stay in sync with live updates
     *.css                  one stylesheet per concern (pitch shell, cards, tooltip, menu)
+background.js            extension service worker -- shows the desktop
+                         notification for a lineup warning (content scripts
+                         can't call chrome.notifications themselves)
 mobile/                  Capacitor app wrapping fantrax.com for iOS/Android
 ```
 
