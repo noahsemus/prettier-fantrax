@@ -1,16 +1,16 @@
 .fx-tooltip {
   position: fixed;
   z-index: 2147483647;
-  background: #12181f;
-  color: #f5f7fa;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--fx-surface);
+  color: var(--fx-text);
+  border: 1px solid var(--fx-border-strong);
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 12px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   line-height: 1.4;
   pointer-events: none;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--fx-shadow);
   max-width: 260px;
   display: none;
   white-space: nowrap;
@@ -25,22 +25,22 @@
    .fx-tip-pts* classes since content.css is the only stylesheet guaranteed
    loaded alongside this script. */
 .fx-tooltip__pts--pos {
-  color: #5be08a;
+  color: var(--fx-stat-pos);
 }
 
 .fx-tooltip__pts--neg {
-  color: #ff8a80;
+  color: var(--fx-stat-neg);
 }
 
 .fx-tooltip__pts--zero {
-  color: #aeb8c4;
+  color: var(--fx-stat-zero);
 }
 
 /* Give the simple-view stat abbreviations a hover affordance so it's
    discoverable that they now do something. */
 .scoring-table__cell__content li > b {
   cursor: help;
-  border-bottom: 1px dotted rgba(255, 255, 255, 0.35);
+  border-bottom: 1px dotted var(--fx-border-strong);
 }
 
 /* Masks content.js's brief, programmatic Stats/Fpts pill flip

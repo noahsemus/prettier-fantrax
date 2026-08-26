@@ -11,22 +11,28 @@
  * Values: green/red match what both duplicated rulesets already agreed on
  * (#5be08a / #ff8a80). The muted "zero" gray had drifted slightly between
  * the two (#aeb8c4 in fx-tip-pts--zero vs #9aa4b2 in fxm-tip__stat--zero)
- * -- standardized here on #aeb8c4, which also matches the pts-color
- * classes on the cards themselves in both features (.fx-card__fpts--zero,
+ * -- standardized on one value, which also matches the pts-color classes
+ * on the cards themselves in both features (.fx-card__fpts--zero,
  * .fxm-card__pts--zero), so the "zero" gray now reads consistently
  * everywhere a stat number appears, not just in the two former tooltip
  * stylesheets.
+ *
+ * These lines only ever render inside a THEMED surface (a tooltip or an
+ * action menu), never on the green pitch, so they take their values from
+ * theme.css's flipping --fx-stat-* tokens: the dark theme keeps the
+ * original bright-on-dark colors, and light mode swaps in darkened
+ * equivalents, since #5be08a/#ff8a80 on a white menu are barely readable.
  * ---------------------------------------------------------------------
  */
 
 .fxs-stat-pts--pos {
-  color: #5be08a;
+  color: var(--fx-stat-pos);
 }
 
 .fxs-stat-pts--neg {
-  color: #ff8a80;
+  color: var(--fx-stat-neg);
 }
 
 .fxs-stat-pts--zero {
-  color: #aeb8c4;
+  color: var(--fx-stat-zero);
 }

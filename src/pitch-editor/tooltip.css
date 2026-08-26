@@ -1,16 +1,16 @@
 .fx-card-tip {
   position: fixed;
   z-index: 2147483647;
-  background: #12181f;
-  color: #f5f7fa;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--fx-surface);
+  color: var(--fx-text);
+  border: 1px solid var(--fx-border-strong);
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 11.5px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   line-height: 1.5;
   pointer-events: none;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--fx-shadow);
   width: max-content;
   max-width: min(260px, calc(100vw - 16px));
   box-sizing: border-box;
@@ -23,14 +23,14 @@
 
 .fx-card-tip__title {
   font-weight: 700;
-  color: #fff;
+  color: var(--fx-text);
   margin-bottom: 3px;
   white-space: normal;
   overflow-wrap: break-word;
 }
 
 .fx-card-tip__row {
-  color: #cfd6de;
+  color: var(--fx-text-secondary);
   white-space: normal;
   overflow-wrap: break-word;
 }

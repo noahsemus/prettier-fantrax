@@ -1,0 +1,98 @@
+/**
+ * Prettier Fantrax -- shared theme tokens (light + dark)
+ * ---------------------------------------------------------------------
+ * Everything this extension draws used to be hardcoded dark, which looked
+ * right only because Fantrax's own default is dark. Switch the site to
+ * light mode and our panels/menus/tooltips stayed near-black in the middle
+ * of a white page.
+ *
+ * HOW FANTRAX SIGNALS THEME (confirmed live on both desktop and the mobile
+ * app): dark mode puts `theme--dark` on `<body>`; light mode carries NO
+ * theme class at all -- `document.body.className` is literally empty. So
+ * light is the DEFAULT here and dark is the override, which is also why
+ * this needs no JS: `body.theme--dark` is a plain ancestor selector, so a
+ * live theme switch restyles everything of ours on the spot, with no
+ * reload, no MutationObserver, and no re-render. Every overlay we create
+ * is appended inside <body> (menus and tooltips included), so all of them
+ * inherit these values.
+ *
+ * The light values are Fantrax's OWN palette, read off their computed
+ * styles rather than invented, so our surfaces sit naturally beside
+ * theirs: their gray scale (--color-gray--50/100/150/400/500/700/900,
+ * e.g. hsl(214 16% 93.5%) for the app background) and their real page
+ * surfaces (white table rows on an hsl(214 16% 93.5%) app background).
+ * We define our own tokens rather than consuming theirs directly because
+ * theirs are an absolute scale (gray--50 is light in BOTH themes), not
+ * semantic roles that flip.
+ *
+ * NOT everything flips. The pitch itself is a green field in both themes
+ * -- that's the whole point of the feature -- so the field, its markings,
+ * the player cards sitting on it, and their translucent dark text plates
+ * keep their own colors and stay legible against grass regardless of
+ * theme. What flips is the CHROME around the pitch: bench/hint panels,
+ * tooltips, action menus, and the text/borders inside them.
+ * ---------------------------------------------------------------------
+ */
+
+:root {
+  /* --- surfaces (light: Fantrax's own white-on-light-gray page) --- */
+  --fx-surface: #fff; /* panels: bench strip, menus, tooltips */
+  --fx-surface-sunken: hsl(214 16% 93.5%); /* secondary strips (hint bar), = their --color-gray--100 */
+  --fx-surface-hover: hsl(214 16% 89%); /* = their --color-gray--150 */
+
+  /* --- text --- */
+  --fx-text: hsl(212 11% 24%); /* = their --color-gray--900 */
+  --fx-text-secondary: hsl(212 14% 31%); /* = --color-gray--700 */
+  --fx-text-muted: hsl(214 15% 47%); /* = --color-gray--500 */
+  --fx-text-faint: hsl(214 12% 60%); /* = --color-gray--400 */
+
+  /* --- lines --- */
+  --fx-border: rgba(0, 0, 0, 0.1);
+  --fx-border-strong: rgba(0, 0, 0, 0.16);
+  --fx-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+
+  /* --- points values on a THEMED surface (menus, tooltips). Two
+         DELIBERATELY different scales, preserved from the pre-theme code
+         rather than merged: a stat BREAKDOWN line marks a positive with
+         green (--fx-stat-*), while a card's/row's headline FPts total uses
+         gold (--fx-pts-*). Light variants are darkened to stay readable on
+         white -- the dark theme's #ffd166 gold and #5be08a green are both
+         near-invisible on a white menu. --- */
+  --fx-stat-pos: hsl(154 62% 28%);
+  --fx-stat-neg: hsl(6 78% 43%);
+  --fx-stat-zero: hsl(214 15% 47%);
+
+  --fx-pts-pos: hsl(38 92% 32%);
+  --fx-pts-neg: hsl(6 78% 43%);
+  --fx-pts-zero: hsl(214 15% 47%);
+
+  /* --- accents --- */
+  --fx-accent: hsl(154 62% 32%); /* our "active"/valid green, darkened for light */
+  --fx-accent-soft: hsl(154 62% 32% / 0.12);
+}
+
+body.theme--dark {
+  --fx-surface: #14181f;
+  --fx-surface-sunken: #0e1116;
+  --fx-surface-hover: rgba(255, 255, 255, 0.06);
+
+  --fx-text: #fff;
+  --fx-text-secondary: #cfd6de;
+  --fx-text-muted: #9aa4b2;
+  --fx-text-faint: #7c8794;
+
+  --fx-border: rgba(255, 255, 255, 0.08);
+  --fx-border-strong: rgba(255, 255, 255, 0.14);
+  --fx-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+
+  --fx-stat-pos: #5be08a;
+  --fx-stat-neg: #ff8a80;
+  --fx-stat-zero: #aeb8c4;
+
+  --fx-pts-pos: #ffd166;
+  --fx-pts-neg: #ff8a80;
+  --fx-pts-zero: #aeb8c4;
+
+  --fx-accent: #5be08a;
+  --fx-accent-soft: rgba(91, 224, 138, 0.12);
+}

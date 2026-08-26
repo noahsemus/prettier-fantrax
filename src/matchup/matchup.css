@@ -23,7 +23,7 @@
   margin: 12px 0 18px;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--fx-border);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
@@ -33,11 +33,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #0e1116;
+  background: var(--fx-surface-sunken);
   padding: 8px 14px;
-  color: #f5f7fa;
+  color: var(--fx-text);
   font-size: 13px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--fx-border);
 }
 
 .fxm-topbar__title {
@@ -54,13 +54,13 @@
   font-size: 12px;
   font-weight: 600;
   font-family: inherit;
-  color: #cfd6de;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--fx-text-secondary);
+  background: var(--fx-surface-hover);
   transition: background 0.15s ease;
 }
 
 .fxm-toggle-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--fx-border-strong);
 }
 
 /* ---------- body layout + team headers ---------- */
@@ -96,9 +96,9 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: #0e1116;
+  background: var(--fx-surface-sunken);
   padding: 10px 14px;
-  color: #f5f7fa;
+  color: var(--fx-text);
 }
 
 .fxm-team-header--home {
@@ -219,6 +219,47 @@
   animation: fxm-marquee 6s ease-in-out infinite alternate;
 }
 
+/* Manager username (e.g. "noahsemus"), fetched same-origin by render.js's
+   ensureOwnersFetched (see fxpa.js's header comment for why this needs a
+   fetch at all -- this data is nowhere in this header's own DOM). A
+   DIRECT child of `.fxm-team-header`, not `.fxm-team-header__top` -- it's
+   its own row under the crest+name row, not squeezed into that row
+   alongside them. Sizing/overflow handling mirrors `.fxm-team-header__name`
+   above (min-width: 0 so it can actually shrink and marquee instead of
+   forcing the header wider; text-overflow: clip for the same "never
+   flashes a bare ellipsis before the marquee measurement pass runs"
+   reason documented there) at a smaller, muted size befitting supporting
+   info rather than the team's own headline name. text-align inherits
+   naturally from `.fxm-team-header`/`.fxm-team-header--away` (right on the
+   away side) with no extra rule needed here, same as `__name` above. */
+.fxm-team-header__owner {
+  min-width: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--fx-text-muted);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.fxm-team-header__owner-text {
+  display: inline-block;
+}
+
+/* Same "force text-align: left so the marquee's 0%/100% line up with the
+   text's real start/end regardless of the box's own (possibly right-
+   aligned) resting alignment" fix as `.fxm-team-header__name--marquee`'s
+   own comment above -- identical reasoning, just for this element. */
+.fxm-team-header__owner--marquee {
+  text-align: left;
+}
+
+.fxm-team-header__owner--marquee .fxm-team-header__owner-text {
+  animation: fxm-marquee 6s ease-in-out infinite alternate;
+}
+
 /* Hero totals: the LIVE score is the whole point of this header, so it
    reads first and reads big -- the projected total stays present but
    deliberately secondary (small, muted) right beneath it. Stacked in a
@@ -231,7 +272,7 @@
 }
 
 .fxm-team-header__live {
-  color: #5be08a;
+  color: var(--fx-stat-pos);
   font-weight: 800;
   font-size: 34px;
   line-height: 1;
@@ -239,7 +280,7 @@
 }
 
 .fxm-team-header__projected {
-  color: #9aa4b2;
+  color: var(--fx-text-muted);
   font-size: 12px;
   font-weight: 600;
   margin-top: 3px;
@@ -461,27 +502,47 @@
   flex-direction: column;
   align-items: center;
   cursor: default;
-  /* Smooths the dim/undim toggle below -- without this the opacity change
-     on tap-select is an instant snap rather than a fade. Harmless on
-     desktop, where .fxm-card--dimmed is never applied (see render.js's
-     setSelectedCard -- touch-tap-only by design). */
+  /* Smooths the container-level dim/undim toggle below -- without this the
+     opacity change when the action menu opens/closes is an instant snap
+     rather than a fade. This only ever plays for a card that's already
+     sitting in the document when `.fxm-matchup--menu-open` toggles (a real
+     open/close); a BRAND NEW card created mid-open (render()'s live-score
+     rebuild -- see the rule below) is never subject to it, since a
+     transition only replays on a style CHANGE to an element already in the
+     render tree, never on an element's very first paint -- exactly why the
+     container-level approach below was needed at all. */
   transition: opacity 0.2s ease;
 }
 
-/* Touch tap-to-select (render.js's setSelectedCard, wired only off the
-   touchend tap path in attachHoverTooltip -- never off desktop
-   mouseenter/mouseleave) -- dims every OTHER card on the pitch/bench so
-   the tapped player's tooltip is unambiguous about which card it belongs
-   to. `.fxm-card--selected` carries no styling of its own on purpose: the
-   tapped card simply never gets `--dimmed`, so it stays exactly as it
-   already looked -- the class exists as a hook (and to make the "who's
-   selected" state explicit in the DOM) rather than to add its own visual
-   treatment. Cleared everywhere hideTooltip() is, since that's the single
-   choke point every close path (toggle-close, tap-outside, stale-target
-   scroll-hide) already routes through.
-   */
-.fxm-card--dimmed {
+/* Action-menu dimming -- container-level, NOT a per-card class the JS
+   toggles after the fact. `action-menu.js` sets/clears
+   `.fxm-matchup--menu-open` on the OUTER `.fxm-matchup` wrapper (which
+   persists across re-renders -- see render.js's ensureContainer, which
+   reuses the same container node rather than rebuilding it), and
+   `.fxm-card--menu-selected` is added to exactly one card -- by
+   render.js's renderCard itself, at creation time, checked against
+   `state.actionMenuIdentity` (see that function's own comment).
+   This used to be the mirror-of-roster's-dimming approach: JS looped every
+   `.fxm-card` after each render and toggled a `.fxm-card--dimmed` class on
+   the ones that weren't selected. That looked fine right after a tap, but
+   matchup's live-score re-renders tear down and rebuild EVERY `.fxm-card`
+   node constantly (far more often than roster's own re-renders) -- each
+   fresh batch of nodes was born with NEITHER class, painted a frame fully
+   undimmed, and only got dimmed by JS a tick later once reapplyActionMenu
+   ran -- a constant, "super distracting" flicker on every other player's
+   card, confirmed live. Doing it with plain CSS descendant selectors
+   instead fixes this for free: a freshly-created `.fxm-card` is dimmed
+   from its very FIRST paint (the rule already applies via
+   `.fxm-matchup--menu-open`, no JS needed to catch up afterward), and the
+   one card renderCard marks `--menu-selected` is exempted from the very
+   same first paint -- there's no "before" frame for either case to flash
+   through. */
+.fxm-matchup--menu-open .fxm-card {
   opacity: 0.35;
+}
+
+.fxm-matchup--menu-open .fxm-card--menu-selected {
+  opacity: 1;
 }
 
 .fxm-card__crest {
@@ -754,9 +815,9 @@
 .fxm-tip {
   position: fixed;
   z-index: 2147483647;
-  background: #12181f;
-  color: #f5f7fa;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--fx-surface);
+  color: var(--fx-text);
+  border: 1px solid var(--fx-border-strong);
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 11.5px;
@@ -776,14 +837,14 @@
 
 .fxm-tip__title {
   font-weight: 700;
-  color: #fff;
+  color: var(--fx-text);
   margin-bottom: 3px;
   white-space: normal;
   overflow-wrap: break-word;
 }
 
 .fxm-tip__row {
-  color: #cfd6de;
+  color: var(--fx-text-secondary);
   white-space: normal;
   overflow-wrap: break-word;
 }
@@ -807,9 +868,9 @@
    side by side in one row, visually the old single bench bar. */
 .fxm-bench {
   min-width: 0;
-  background: #14181f;
+  background: var(--fx-surface);
   padding: 10px 14px 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--fx-border);
 }
 
 .fxm-bench--home {
@@ -829,7 +890,7 @@
 }
 
 .fxm-bench__label {
-  color: #9aa4b2;
+  color: var(--fx-text-muted);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -943,8 +1004,10 @@
      inside `.fxm-team-header`'s flex-column reads fine side-by-side with
      the opposing team's header, but at this breakpoint the header block is
      the ONLY thing next to its own half of the (now vertical) field, so the
-     crest is promoted to a proper avatar spanning the whole block instead
-     of a small mark that only sits next to the name.
+     crest is promoted to a proper avatar spanning the whole block (now
+     four stacked lines of text once the owner line exists: name, owner,
+     hero live total, projected) instead of a small mark that only sits
+     next to the name.
      `.fxm-team-header__top` is switched to `display: contents` so it
      dissolves out of the layout -- its two children (`__logo`, `__name`)
      become direct grid items of `.fxm-team-header` itself, independently
@@ -959,6 +1022,7 @@
     grid-template-columns: auto 1fr;
     grid-template-areas:
       "logo name"
+      "logo owner"
       "logo scores";
     column-gap: 10px;
     align-items: center;
@@ -966,6 +1030,15 @@
 
   .fxm-team-header__top {
     display: contents;
+  }
+
+  /* `.fxm-team-header__owner` is a direct child of `.fxm-team-header` at
+     EVERY breakpoint already (see the base rule's own comment) -- unlike
+     `__logo`/`__name`, it needs no `display: contents` promotion here,
+     just its own named area in the grid above so it doesn't fall back to
+     un-placed auto-flow. */
+  .fxm-team-header__owner {
+    grid-area: owner;
   }
 
   .fxm-team-header__logo {
@@ -1070,4 +1143,36 @@
   .fxm-card:not(.fxm-card--bench) .fxm-card__pts {
     font-size: 10px;
   }
+}
+
+/* ---------- bench cards in light mode ----------
+   Same reasoning as pitch-editor/card.css's own bench block: matchup's
+   bench cards sit on .fxm-bench (a themed surface), not on the green
+   field, so their grass-tuned dark plate and white text need re-toning for
+   light mode. Dark mode and every card actually on the pitch are
+   untouched. */
+body:not(.theme--dark) .fxm-bench .fxm-card__info {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+body:not(.theme--dark) .fxm-bench .fxm-card__name {
+  color: var(--fx-text);
+  text-shadow: none;
+}
+
+body:not(.theme--dark) .fxm-bench .fxm-card__opp {
+  color: var(--fx-text-muted);
+  opacity: 1;
+}
+
+body:not(.theme--dark) .fxm-bench .fxm-card__pts--pos {
+  color: var(--fx-pts-pos);
+}
+
+body:not(.theme--dark) .fxm-bench .fxm-card__pts--neg {
+  color: var(--fx-pts-neg);
+}
+
+body:not(.theme--dark) .fxm-bench .fxm-card__pts--zero {
+  color: var(--fx-pts-zero);
 }
