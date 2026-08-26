@@ -10,18 +10,29 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.fantrax.com/*"],
-      "js": ["src/shared/stat-names.js", "src/content/content.js"],
-      "css": ["src/shared/theme.css", "src/content/content.css"],
+      "matches": [
+        "https://www.fantrax.com/*"
+      ],
+      "js": [
+        "src/shared/stat-names.js",
+        "src/content/content.js"
+      ],
+      "css": [
+        "src/shared/theme.css",
+        "src/content/content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://www.fantrax.com/*"],
+      "matches": [
+        "https://www.fantrax.com/*"
+      ],
       "js": [
         "src/shared/stat-names.js",
         "src/shared/touch-overlay.js",
         "src/shared/fantrax-api.js",
         "src/shared/last5.js",
+        "src/shared/lineup-alerts.js",
         "src/pitch-editor/state.js",
         "src/pitch-editor/roster.js",
         "src/pitch-editor/tabs.js",
@@ -44,7 +55,9 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://www.fantrax.com/*"],
+      "matches": [
+        "https://www.fantrax.com/*"
+      ],
       "js": [
         "src/shared/stat-names.js",
         "src/shared/touch-overlay.js",
@@ -56,8 +69,19 @@
         "src/matchup/action-menu.js",
         "src/matchup/main.js"
       ],
-      "css": ["src/shared/theme.css", "src/shared/touch-overlay.css", "src/matchup/matchup.css", "src/matchup/action-menu.css"],
+      "css": [
+        "src/shared/theme.css",
+        "src/shared/touch-overlay.css",
+        "src/matchup/matchup.css",
+        "src/matchup/action-menu.css"
+      ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "permissions": [
+    "notifications"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
 }

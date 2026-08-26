@@ -407,3 +407,40 @@ button:has(> mat-icon[svgicon="soccer_field"]) {
     animation: none;
   }
 }
+
+/* ---------- "your starter isn't starting" banner ----------
+   Shown when a player in the ACTIVE lineup is benched or left out by their
+   real club and their game hasn't kicked off yet -- see
+   src/shared/lineup-alerts.js for the detection and for why this in-page
+   banner exists alongside the desktop/mobile notifications (it's the one
+   delivery layer that always works, with no permission and nothing needing
+   to be running in the background).
+
+   Sits directly under the pitch header, above the field, because it's
+   time-sensitive and about the lineup you're looking at -- putting it down
+   with the hint text would bury the one thing worth acting on. Warning
+   colors come from theme.css so it follows light/dark like everything
+   else. */
+.fx-pitch__alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--fx-warn-bg);
+  color: var(--fx-warn-fg);
+  border-bottom: 1px solid var(--fx-warn-border);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* A warning triangle, drawn in text rather than shipped as an asset --
+   inline so it can't be selected or read out as content by a screen
+   reader (the banner itself carries role="status", so the text is already
+   announced). */
+.fx-pitch__alert::before {
+  content: "⚠";
+  flex: 0 0 auto;
+  font-size: 14px;
+  line-height: 1;
+}

@@ -200,6 +200,23 @@
       return;
     }
 
+    // "Your starter isn't starting" check. Runs here, after the
+    // loading-overlay early return above, so it only ever sees a fully
+    // parsed roster for the gameweek actually on screen -- never a
+    // half-loaded one mid-gameweek-switch, which would otherwise fire
+    // alerts off transient state. Detection, dedupe and the notification
+    // channels all live in src/shared/lineup-alerts.js; this file only
+    // renders the banner, per this codebase's shared-logic /
+    // own-feature-DOM convention.
+    const lineupCheck = FXShared.checkLineup ? FXShared.checkLineup(players, gwKey) : null;
+    if (lineupCheck && lineupCheck.banner) {
+      const alertEl = document.createElement('div');
+      alertEl.className = 'fx-pitch__alert';
+      alertEl.setAttribute('role', 'status');
+      alertEl.textContent = lineupCheck.banner;
+      container.appendChild(alertEl);
+    }
+
     const jerseyMap = buildJerseyMap();
 
     const field = document.createElement('div');

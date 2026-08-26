@@ -79,6 +79,11 @@
   --fx-loss-fg: hsl(6 78% 38%);
   --fx-draw-bg: hsl(214 16% 89%);
   --fx-draw-fg: hsl(212 14% 31%);
+
+  /* --- lineup-warning banner (a starter who isn't starting) --- */
+  --fx-warn-bg: hsl(38 92% 94%);
+  --fx-warn-fg: hsl(30 90% 26%);
+  --fx-warn-border: hsl(38 92% 78%);
 }
 
 body.theme--dark {
@@ -112,4 +117,8 @@ body.theme--dark {
   --fx-loss-fg: #ff8a80;
   --fx-draw-bg: rgba(255, 255, 255, 0.12);
   --fx-draw-fg: #cfd6de;
+
+  --fx-warn-bg: rgba(255, 209, 102, 0.14);
+  --fx-warn-fg: #ffd166;
+  --fx-warn-border: rgba(255, 209, 102, 0.35);
 }
