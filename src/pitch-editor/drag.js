@@ -35,7 +35,28 @@
   let touchTimer = null;
   let touchStartX = 0;
   let touchStartY = 0;
+  let touchInProgress = false; // any finger currently down on a card (see the dragstart veto below)
   let touchActive = false; // true once the long-press has "lifted" the card
+  let lastTouchTs = 0; // when a finger last touched any card -- see isTouchDerived
+
+  // "Is this mouse event real, or synthesized from a touch gesture?" The
+  // hover tooltip must only follow an actual mouse: Android dispatches
+  // hover-emulation mouse events (mouseover/mouseenter/mousemove) at the
+  // long-press moment once the native drag is vetoed (verified live
+  // on-device: they land ~500ms into the hold, popping the tooltip in the
+  // middle of a touch drag), and both platforms fire the standard
+  // compatibility chain right after an unprevented tap's touchend. Three
+  // tests, cheapest first: a finger is currently down (the mid-gesture
+  // emulation case), the browser says so itself (sourceCapabilities is
+  // Chromium-only but authoritative there), or a touch ended moments ago
+  // (the after-tap chain on iOS, which lacks sourceCapabilities). A real
+  // mouse used >1s after the last touch passes all three and hovers
+  // normally.
+  function isTouchDerived(e) {
+    if (touchInProgress || touchActive) return true;
+    if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return true;
+    return Date.now() - lastTouchTs < 1000;
+  }
   let touchSourcePlayer = null;
   let touchSourceCard = null;
   let touchGhostEl = null;
@@ -213,6 +234,19 @@
     card.draggable = canDrag;
 
     card.addEventListener('dragstart', (e) => {
+      // Android (WebView and Chrome) starts a NATIVE HTML5 drag on a
+      // long-press of a draggable element at ~490ms -- right after our own
+      // 375ms touch lift. Letting it start fires touchcancel, which tears
+      // down the just-lifted ghost and kills the whole touch drag
+      // (verified live on-device: touchstart -> [375ms] lift -> [491ms]
+      // native dragstart -> [534ms] touchcancel -> everything reset). The
+      // touch path owns any gesture that began with a finger, so veto the
+      // native drag for the duration of the touch; mouse-initiated drags
+      // never have a touch in flight and are unaffected.
+      if (touchInProgress || touchActive) {
+        e.preventDefault();
+        return;
+      }
       if (!canDrag) {
         e.preventDefault();
         return;
@@ -255,6 +289,8 @@
     card.addEventListener(
       'touchstart',
       (e) => {
+        touchInProgress = true; // before any early return -- the dragstart veto must cover every touch
+        lastTouchTs = Date.now();
         if (!canDrag) return;
         if (e.touches.length !== 1) return; // ignore multi-touch (pinch/scroll gestures)
         const t = e.touches[0];
@@ -290,6 +326,8 @@
     card.addEventListener(
       'touchend',
       (e) => {
+        touchInProgress = false;
+        lastTouchTs = Date.now();
         if (touchActive) {
           e.preventDefault();
           finishTouchDrag();
@@ -301,6 +339,8 @@
     );
 
     card.addEventListener('touchcancel', () => {
+      touchInProgress = false;
+      lastTouchTs = Date.now();
       clearTouchTimer();
       if (touchActive) endTouchDrag();
     });
@@ -330,12 +370,14 @@
 
     if (!p.isEmpty) {
       card.addEventListener('mouseenter', (e) => {
+        if (isTouchDerived(e)) return; // touch flows show stats via the action menu, never hover
         state.hoveredKey = p.key;
         state.lastMouseX = e.clientX;
         state.lastMouseY = e.clientY;
         FXP.showCardTip(FXP.buildTooltipLines(p), e.clientX, e.clientY);
       });
       card.addEventListener('mousemove', (e) => {
+        if (isTouchDerived(e)) return;
         state.lastMouseX = e.clientX;
         state.lastMouseY = e.clientY;
         if (state.tooltipEl && state.tooltipEl.classList.contains('fx-card-tip--visible')) {

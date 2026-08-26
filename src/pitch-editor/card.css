@@ -6,6 +6,10 @@
   align-items: center;
   cursor: grab;
   user-select: none;
+  /* iOS's own long-press callout (the copy/share sheet) would otherwise
+     fight the tap-and-hold lift gesture, same way Android's native
+     long-press drag did -- see the dragstart veto in drag.js. */
+  -webkit-touch-callout: none;
   border-radius: 8px;
   padding: 5px 4px 6px;
   background: transparent;
@@ -127,7 +131,15 @@
   line-height: 1.2;
   max-width: 84px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  /* clip, never ellipsis: the name text is an inline-block span (an atomic
+     inline), and text-overflow: ellipsis hides a partially-fitting atomic
+     inline ENTIRELY -- an overflowing name rendered as a bare "..." in the
+     gap before render.js's applyMarquee measurement pass runs, or forever
+     when a sub-pixel overflow rounded to scrollWidth === clientWidth and
+     never tripped the marquee at all (constant on Android, where Roboto
+     runs wider). Real overflow marquees instead of truncating (below), so
+     ellipsis has no case left where it helps. */
+  text-overflow: clip;
   white-space: nowrap;
   pointer-events: none;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
@@ -135,18 +147,12 @@
 }
 
 /* Long names that don't fit in the 84px box marquee instead of truncating.
-   render.js measures every card after each render and only adds this class
-   (plus --fx-marquee-dist, how far left the inner span needs to travel) to
-   names that actually overflow -- names that fit are left completely alone.
-   The event-status dot lives outside `.fx-card__name-inner` (see renderCard
-   in render.js) so it stays fixed in place while only the name text
-   scrolls. text-overflow only matters for the non-marquee ellipsis case
-   above, but `clip` here avoids Safari/Firefox drawing an ellipsis over the
-   animating text at the extremes of its travel. */
-.fx-card__name--marquee {
-  text-overflow: clip;
-}
-
+   render.js measures every card after each render and only adds
+   .fx-card__name--marquee (plus --fx-marquee-dist, how far left the inner
+   span needs to travel) to names that actually overflow -- names that fit
+   are left completely alone. The event-status dot lives outside
+   `.fx-card__name-inner` (see renderCard in render.js) so it stays fixed
+   in place while only the name text scrolls. */
 .fx-card__name-inner {
   display: inline-block;
   will-change: transform;
@@ -232,16 +238,12 @@
 }
 
 /* Long game/opponent lines that don't fit in the 86px box marquee instead of
-   truncating -- same mechanism as .fx-card__name--marquee above (see that
-   comment and applyMarquee/MARQUEE_SETS in render.js), just applied to a
-   different element and reusing the SAME fx-marquee keyframes rather than a
-   duplicate declaration. text-overflow stays `clip` here too, avoiding
-   Safari/Firefox drawing an ellipsis over the animating text at the
-   extremes of its travel. */
-.fx-card__opp--marquee {
-  text-overflow: clip;
-}
-
+   truncating -- same mechanism as the name marquee above (see that comment
+   and applyMarquee/MARQUEE_SETS in render.js), just applied to a different
+   element and reusing the SAME fx-marquee keyframes rather than a
+   duplicate declaration. The base rule's text-overflow is already `clip`
+   (same atomic-inline reasoning as .fx-card__name), so the marquee class
+   needs no override of its own. */
 .fx-card__opp-inner {
   display: inline-block;
   will-change: transform;
@@ -304,4 +306,39 @@
     animation: none;
     border-top-color: rgba(255, 255, 255, 0.75);
   }
+}
+
+/* ---------- bench cards in light mode ----------
+   Bench cards are the one place a card does NOT sit on grass: they sit on
+   .fx-bench, which follows the site theme (see src/shared/theme.css). The
+   translucent-black info plate and white text below are tuned for green,
+   and over a white bench panel they read as gray boxes with washed-out
+   text. Re-tone just those cards for light mode -- the pitch's own cards,
+   and everything in dark mode (where the plate over #14181f already looks
+   right), are untouched. The text-shadow goes too: it exists to lift white
+   text off grass, and only muddies dark text on a light plate. */
+body:not(.theme--dark) .fx-bench .fx-card__info {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+body:not(.theme--dark) .fx-bench .fx-card__name {
+  color: var(--fx-text);
+  text-shadow: none;
+}
+
+body:not(.theme--dark) .fx-bench .fx-card__opp {
+  color: var(--fx-text-muted);
+  opacity: 1;
+}
+
+body:not(.theme--dark) .fx-bench .fx-card__fpts--pos {
+  color: var(--fx-pts-pos);
+}
+
+body:not(.theme--dark) .fx-bench .fx-card__fpts--neg {
+  color: var(--fx-pts-neg);
+}
+
+body:not(.theme--dark) .fx-bench .fx-card__fpts--zero {
+  color: var(--fx-pts-zero);
 }

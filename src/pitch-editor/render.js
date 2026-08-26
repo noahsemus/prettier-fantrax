@@ -296,8 +296,19 @@
         qa(selector, container).forEach((el) => {
           const inner = el.querySelector(innerSelector);
           if (!inner) return;
-          const dist = inner.scrollWidth - el.clientWidth;
-          if (dist > 1) {
+          // Measure the box's full content overflow (el.scrollWidth), not
+          // the inner span's own width: the event-status dot sits OUTSIDE
+          // the inner span (see renderCard), so measuring the span alone
+          // left a window where the text alone fit but dot+text overflowed
+          // -- no marquee, and text-overflow's ellipsis hides a partially
+          // fitting atomic inline (the inline-block span) entirely,
+          // collapsing the whole name to a bare "..." (constant on
+          // Android, where Roboto runs wider than desktop fonts). Same
+          // container-based measure matchup's applyMarqueeToSet uses. The
+          // travel distance is identical either way: the span's right edge
+          // must reach the box's right edge.
+          const dist = el.scrollWidth - el.clientWidth;
+          if (dist > 0) {
             const card = el.closest('.fx-card');
             const key = card && card.dataset.key ? `${keyPrefix}${card.dataset.key}` : null;
             overflowing.push({ el, inner, dist, key, marqueeClass });
