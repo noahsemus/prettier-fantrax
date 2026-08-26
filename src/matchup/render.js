@@ -110,13 +110,69 @@
     return tip;
   }
 
+  // ---------- recent performances, in the hover tooltip ----------
+  // Desktop's counterpart to the touch action menu's own block: hover is
+  // the desktop idiom for "tell me more about this player", so the same
+  // recent form shows there and the two platforms stay at parity. Gated
+  // like every other place it appears -- only before kickoff, since
+  // afterwards the real number has replaced the question it answers.
+  function formatRecentOpponent(oppText) {
+    const trimmed = (oppText || '').trim();
+    if (!trimmed) return '';
+    if (trimmed.charAt(0) === '@') return `@ ${trimmed.slice(1).trim()}`;
+    return `vs ${trimmed}`;
+  }
+
+  function renderRecentInto(section, rows) {
+    const title = el('div', 'fxm-tip__recent-title', 'Recent performances');
+    section.appendChild(title);
+    if (!rows || !rows.length) {
+      const msg = el('div', 'fxm-tip__row fxm-tip__recent-muted', rows ? 'No games played yet' : 'Couldn’t load');
+      section.appendChild(msg);
+      return;
+    }
+    rows.forEach((g) => {
+      const row = el('div', 'fxm-tip__row');
+      const pts = g.fpts !== '' && g.fpts != null ? formatSigned(g.fpts) : '0';
+      FXShared.renderStatLine(row, { text: formatRecentOpponent(g.opponent) || g.date || '', pts });
+      section.appendChild(row);
+    });
+  }
+
+  function appendRecentSection(tip, p, side) {
+    if (!p || !FXShared.getLast5) return;
+    if (gameState(p.gameText) !== 'upcoming') return;
+    const teamId = side === 'home' ? state.homeTeamId : state.awayTeamId;
+    const section = el('div', 'fxm-tip__recent');
+    tip.appendChild(section);
+
+    const cached = FXShared.peekLast5(p.name, teamId);
+    if (cached !== undefined) {
+      renderRecentInto(section, cached);
+      return;
+    }
+    section.appendChild(el('div', 'fxm-tip__recent-title', 'Recent performances: loading…'));
+    FXShared.getLast5(p.name, teamId).then((rows) => {
+      // Only paint if this same player is still hovered -- the pointer may
+      // have moved on, or the tooltip been rebuilt for someone else.
+      if (state.hoveredName !== p.name) return;
+      if (!state.tooltipEl || !state.tooltipEl.classList.contains('fxm-tip--visible')) return;
+      const live = state.tooltipEl.querySelector('.fxm-tip__recent');
+      if (!live) return;
+      live.innerHTML = '';
+      renderRecentInto(live, rows);
+      positionTooltip(state.lastMouseX, state.lastMouseY);
+    });
+  }
+
   // Desktop mouse path only -- positions the tip near the live cursor
   // coordinates, flipping to the other side of the pointer if it would
   // otherwise overflow the viewport. Untouched by the touch/anchor work
   // below; see attachHoverTooltip's mouseenter/mousemove.
-  function showTooltip(lines, x, y) {
+  function showTooltip(lines, x, y, p, side) {
     if (!lines || !lines.length) return;
-    renderTooltipContent(lines);
+    const tip = renderTooltipContent(lines);
+    appendRecentSection(tip, p, side);
     positionTooltip(x, y);
   }
 
@@ -407,7 +463,7 @@
       state.hoveredName = p.name;
       state.lastMouseX = e.clientX;
       state.lastMouseY = e.clientY;
-      showTooltip(buildTooltipLines(p), e.clientX, e.clientY);
+      showTooltip(buildTooltipLines(p), e.clientX, e.clientY, p, side);
     });
     card.addEventListener('mousemove', (e) => {
       state.lastMouseX = e.clientX;

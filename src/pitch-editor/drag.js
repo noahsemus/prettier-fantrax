@@ -374,7 +374,7 @@
         state.hoveredKey = p.key;
         state.lastMouseX = e.clientX;
         state.lastMouseY = e.clientY;
-        FXP.showCardTip(FXP.buildTooltipLines(p), e.clientX, e.clientY);
+        FXP.showCardTip(FXP.buildTooltipLines(p), e.clientX, e.clientY, p);
       });
       card.addEventListener('mousemove', (e) => {
         if (isTouchDerived(e)) return;

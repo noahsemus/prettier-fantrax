@@ -41,3 +41,30 @@
    src/shared/touch-overlay.css. Was `.fx-tip-pts--*` here; removed in
    favor of the shared classes (also used by matchup's tooltip) so the
    color values can't drift between the two features again. */
+
+/* ---------- recent performances, inside the hover tooltip ----------
+   Desktop's equivalent of the touch action menu's own block -- hover is
+   where a desktop user asks "tell me more about this player", so the same
+   information lives there rather than being mobile-only. Set off from the
+   stat lines above by a hairline rule and its own heading, so the tooltip
+   still reads as two distinct things (what they did / how they've been
+   doing) rather than one long list. */
+.fx-card-tip__recent {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid var(--fx-border);
+}
+
+.fx-card-tip__recent-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fx-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.fx-card-tip__recent-muted {
+  color: var(--fx-text-faint);
+  font-style: italic;
+}

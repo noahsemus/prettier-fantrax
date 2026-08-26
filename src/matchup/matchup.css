@@ -1228,3 +1228,28 @@ body:not(.theme--dark) .fxm-bench .fxm-card__pts--zero {
   background: var(--fx-draw-bg);
   color: var(--fx-draw-fg);
 }
+
+/* ---------- recent performances, inside the hover tooltip ----------
+   Desktop's equivalent of the action menu's own block (see
+   action-menu.css) -- same information, in the place a desktop user asks
+   for it. Mirrors pitch-editor/tooltip.css's `.fx-card-tip__recent`
+   rules under this feature's own prefix. */
+.fxm-tip__recent {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid var(--fx-border);
+}
+
+.fxm-tip__recent-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fx-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.fxm-tip__recent-muted {
+  color: var(--fx-text-faint);
+  font-style: italic;
+}

@@ -326,6 +326,10 @@
     }, 0);
   }
 
+  // Exported so tooltip.js can key its own recent-performances lookup the
+  // same way this menu does -- both must agree on the team id or they'd
+  // fetch (and cache) the same player twice.
+  FXP.rosterTeamId = rosterTeamId;
   FXP.openActionMenu = openActionMenu;
   FXP.closeActionMenu = closeActionMenu;
   FXP.triggerRowAction = triggerRowAction;

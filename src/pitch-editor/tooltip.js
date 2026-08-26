@@ -45,7 +45,76 @@
     return el;
   }
 
-  function showCardTip(lines, x, y) {
+  // ---------- recent performances, in the hover tooltip ----------
+  // Desktop has no action menu section to put this in (that's the
+  // coarse-pointer path), and hover IS the desktop idiom for "tell me more
+  // about this player" -- so the same recent-form block the touch menu
+  // shows is appended here, keeping the two platforms at parity rather
+  // than making this a mobile-only feature.
+  //
+  // Gated exactly like the menus: only for players whose game hasn't
+  // kicked off, since afterwards the real number has replaced the
+  // question recent form was answering.
+  function appendRecentSection(el, p) {
+    if (!p || p.isEmpty || p.locked || !FXShared.getLast5) return;
+    const teamId = FXP.rosterTeamId ? FXP.rosterTeamId() : null;
+    const cached = FXShared.peekLast5(p.name, teamId);
+    const section = document.createElement('div');
+    section.className = 'fx-card-tip__recent';
+    el.appendChild(section);
+
+    if (cached !== undefined) {
+      renderRecentInto(section, cached);
+      return;
+    }
+    const loading = document.createElement('div');
+    loading.className = 'fx-card-tip__recent-title';
+    loading.textContent = 'Recent performances: loading…';
+    section.appendChild(loading);
+    FXShared.getLast5(p.name, teamId).then((rows) => {
+      // Only paint if this same player is still the one being hovered --
+      // by the time a fetch resolves the pointer may be on someone else,
+      // or gone entirely.
+      if (state.hoveredKey !== p.key) return;
+      if (!state.tooltipEl || !state.tooltipEl.classList.contains('fx-card-tip--visible')) return;
+      const live = state.tooltipEl.querySelector('.fx-card-tip__recent');
+      if (!live) return;
+      live.innerHTML = '';
+      renderRecentInto(live, rows);
+      positionCardTip(state.lastMouseX, state.lastMouseY);
+    });
+  }
+
+  function renderRecentInto(section, rows) {
+    const title = document.createElement('div');
+    title.className = 'fx-card-tip__recent-title';
+    title.textContent = 'Recent performances';
+    section.appendChild(title);
+    if (!rows || !rows.length) {
+      const msg = document.createElement('div');
+      msg.className = 'fx-card-tip__row fx-card-tip__recent-muted';
+      msg.textContent = rows ? 'No games played yet' : 'Couldn’t load';
+      section.appendChild(msg);
+      return;
+    }
+    rows.forEach((g) => {
+      const row = document.createElement('div');
+      row.className = 'fx-card-tip__row';
+      const pts = g.fpts !== '' && g.fpts != null ? formatSigned(g.fpts) : '0';
+      const opp = formatRecentOpponent(g.opponent) || g.date || '';
+      FXShared.renderStatLine(row, { text: opp, pts });
+      section.appendChild(row);
+    });
+  }
+
+  function formatRecentOpponent(oppText) {
+    const trimmed = (oppText || '').trim();
+    if (!trimmed) return '';
+    if (trimmed.charAt(0) === '@') return `@ ${trimmed.slice(1).trim()}`;
+    return `vs ${trimmed}`;
+  }
+
+  function showCardTip(lines, x, y, p) {
     if (!lines || !lines.length) return;
     const el = ensureCardTip();
     el.innerHTML = '';
@@ -55,6 +124,7 @@
       FXShared.renderStatLine(row, line);
       el.appendChild(row);
     });
+    appendRecentSection(el, p);
     el.classList.add('fx-card-tip--visible');
     positionCardTip(x, y);
   }
@@ -84,7 +154,7 @@
     if (!state.hoveredKey || !state.tooltipEl || !state.tooltipEl.classList.contains('fx-card-tip--visible')) return;
     const p = FXP.parseRoster().find((x) => x.key === state.hoveredKey);
     if (!p) return;
-    showCardTip(buildTooltipLines(p), state.lastMouseX, state.lastMouseY);
+    showCardTip(buildTooltipLines(p), state.lastMouseX, state.lastMouseY, p);
   }
 
   function formatSigned(text) {
