@@ -69,6 +69,16 @@
   /* --- accents --- */
   --fx-accent: hsl(154 62% 32%); /* our "active"/valid green, darkened for light */
   --fx-accent-soft: hsl(154 62% 32% / 0.12);
+
+  /* --- W/L/D result chip (matchup team headers, completed matchups) ---
+         Tinted plate + saturated text in light; the inverse weighting in
+         dark, where a solid pale plate would glare. */
+  --fx-win-bg: hsl(154 62% 90%);
+  --fx-win-fg: hsl(154 62% 24%);
+  --fx-loss-bg: hsl(6 78% 94%);
+  --fx-loss-fg: hsl(6 78% 38%);
+  --fx-draw-bg: hsl(214 16% 89%);
+  --fx-draw-fg: hsl(212 14% 31%);
 }
 
 body.theme--dark {
@@ -95,4 +105,11 @@ body.theme--dark {
 
   --fx-accent: #5be08a;
   --fx-accent-soft: rgba(91, 224, 138, 0.12);
+
+  --fx-win-bg: rgba(91, 224, 138, 0.18);
+  --fx-win-fg: #5be08a;
+  --fx-loss-bg: rgba(255, 138, 128, 0.18);
+  --fx-loss-fg: #ff8a80;
+  --fx-draw-bg: rgba(255, 255, 255, 0.12);
+  --fx-draw-fg: #cfd6de;
 }

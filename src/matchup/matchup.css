@@ -1176,3 +1176,42 @@ body:not(.theme--dark) .fxm-bench .fxm-card__pts--neg {
 body:not(.theme--dark) .fxm-bench .fxm-card__pts--zero {
   color: var(--fx-pts-zero);
 }
+
+/* ---------- W/L/D result chip ----------
+   Rendered next to the team name only once every player's real-life game
+   has been played (see render.js's matchupResult for why "the gameweek is
+   in the past" isn't the test). Fantrax shows no result indicator of its
+   own anywhere in this header -- it just prints both totals -- so this is
+   the one place the outcome is stated outright instead of left as a
+   comparison of two decimals.
+
+   flex: 0 0 auto for the same reason the crest has it: the name beside it
+   marquees, and the chip must never be the thing that gets squeezed.
+   Colors come from theme.css so the chip follows light/dark like the rest
+   of the header. */
+.fxm-team-header__result {
+  flex: 0 0 auto;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+.fxm-team-header__result--w {
+  background: var(--fx-win-bg);
+  color: var(--fx-win-fg);
+}
+
+.fxm-team-header__result--l {
+  background: var(--fx-loss-bg);
+  color: var(--fx-loss-fg);
+}
+
+.fxm-team-header__result--d {
+  background: var(--fx-draw-bg);
+  color: var(--fx-draw-fg);
+}

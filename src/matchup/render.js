@@ -751,7 +751,51 @@
   // (unlike a player, who at least theoretically could change), so a plain
   // "header:home"/"header:away" data-marquee-key is enough; no need for the
   // richer side:isBench:name shape marqueeKey builds for player cards.
-  function renderTeamHeader(side, extraClass, key) {
+  // ---------- W/L/D result chip (completed matchups only) ----------
+  // Fantrax marks a finished matchup nowhere in this page's own header --
+  // it just keeps showing both totals (confirmed live on a past gameweek:
+  // "It's Carrick, You Know FC 74.55" vs "Fodenfreezone 80.68", with no
+  // result indicator anywhere), so who actually won is left for the reader
+  // to work out by comparing two decimals. This derives it.
+  //
+  // "Completed" deliberately means EVERY player's real-life game has been
+  // played, not merely "this gameweek is in the past": mid-gameweek, one
+  // side leading with fixtures still to come is not a result, and labelling
+  // it W/L would be actively misleading. gameState() already classifies a
+  // player's game from its own text, so the test is simply that nothing is
+  // still 'upcoming' ('unknown' counts as done -- see gameState's own
+  // comment on why it trusts a number it can't positively identify as a
+  // projection). Returns null when the matchup isn't finished, or when
+  // either total isn't a number we can compare, so callers render no chip
+  // at all rather than a wrong or empty one.
+  function matchupResult(data) {
+    const sides = [data.home, data.away];
+    const players = sides.reduce((acc, s) => acc.concat((s && s.players) || []), []);
+    if (!players.length) return null;
+    if (players.some((p) => gameState(p.gameText) === 'upcoming')) return null;
+
+    const homeScore = parseFloat(data.home.header.live);
+    const awayScore = parseFloat(data.away.header.live);
+    if (!isFinite(homeScore) || !isFinite(awayScore)) return null;
+
+    if (homeScore === awayScore) return { home: 'D', away: 'D' };
+    const homeWon = homeScore > awayScore;
+    return { home: homeWon ? 'W' : 'L', away: homeWon ? 'L' : 'W' };
+  }
+
+  const RESULT_LABEL = { W: 'Won', L: 'Lost', D: 'Drew' };
+
+  function renderResultChip(result) {
+    const chip = el('div', `fxm-team-header__result fxm-team-header__result--${result.toLowerCase()}`);
+    chip.textContent = result;
+    // The letter alone is the whole visual, so give assistive tech (and a
+    // desktop hover) the word rather than making them infer it.
+    chip.title = RESULT_LABEL[result] || '';
+    chip.setAttribute('aria-label', RESULT_LABEL[result] || result);
+    return chip;
+  }
+
+  function renderTeamHeader(side, extraClass, key, result) {
     const header = el('div', `fxm-team-header ${extraClass}`);
     // Name row: team crest (when present) beside the team name -- see
     // matchup.css's `.fxm-team-header__top` for how this row itself gets
@@ -782,6 +826,11 @@
     // exactly like a player card's name.
     nameEl.appendChild(el('span', 'fxm-team-header__name-text', side.header.name || ''));
     top.appendChild(nameEl);
+    // Result chip beside the name. `top` is a flex row that CSS mirrors for
+    // the away side, so appending here puts the chip on the correct edge of
+    // each header without either side needing its own ordering logic. Only
+    // rendered for a genuinely completed matchup -- see matchupResult.
+    if (result) top.appendChild(renderResultChip(result));
     header.appendChild(top);
     // Manager username, e.g. "noahsemus" -- NOT present anywhere in this
     // header's own DOM (confirmed live; see fxpa.js's header comment), so
@@ -1017,8 +1066,11 @@
     // grid-template-areas reorders these visually at the narrow breakpoint
     // (each bench moves next to its own team's header) without any JS
     // branching here.
-    body.appendChild(renderTeamHeader(data.home, 'fxm-team-header--home', 'home'));
-    body.appendChild(renderTeamHeader(data.away, 'fxm-team-header--away', 'away'));
+    // Computed once for the matchup, not per side, so the two headers can
+    // never disagree about who won.
+    const result = matchupResult(data);
+    body.appendChild(renderTeamHeader(data.home, 'fxm-team-header--home', 'home', result && result.home));
+    body.appendChild(renderTeamHeader(data.away, 'fxm-team-header--away', 'away', result && result.away));
     body.appendChild(renderField(data));
     body.appendChild(renderBenchSide(data.home.reserves, 'fxm-bench--home', 'home'));
     body.appendChild(renderBenchSide(data.away.reserves, 'fxm-bench--away', 'away'));
