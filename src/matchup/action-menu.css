@@ -1,0 +1,144 @@
+/**
+ * Prettier Fantrax -- Matchup Pitch: per-player action menu styles
+ * ---------------------------------------------------------------------
+ * Literal copy of pitch-editor/action-menu.css's colors/sizing/shadow
+ * values under this feature's own `fxm-` prefix (never `fx-`, for the same
+ * collision-avoidance reason as the rest of matchup.css) -- the two menus
+ * are meant to look identical, just namespaced per feature like every
+ * other matchup/pitch-editor pair (tooltip vs. tip, card vs. card). Colors
+ * here already matched matchup.css's own dark-theme palette 1:1 before this
+ * file existed (#12181f chrome, same border/font-family strings), so no
+ * values needed to change in the copy.
+ * ---------------------------------------------------------------------
+ */
+
+.fxm-action-menu {
+  position: fixed;
+  z-index: 2147483647;
+  background: var(--fx-surface);
+  border: 1px solid var(--fx-border-strong);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 160px;
+  box-shadow: var(--fx-shadow);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.fxm-action-menu__item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--fx-text);
+  font-size: 12.5px;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.fxm-action-menu__item:hover:not(:disabled) {
+  background: var(--fx-surface-hover);
+}
+
+.fxm-action-menu__item--danger {
+  color: var(--fx-stat-neg);
+}
+
+.fxm-action-menu__item--disabled,
+.fxm-action-menu__item:disabled {
+  color: var(--fx-text-faint);
+  cursor: not-allowed;
+}
+
+/* Read-only stats block (coarse-pointer/touch only -- see action-menu.js).
+   Mirrors the hover tooltip's (.fxm-tip) title/row hierarchy at
+   menu-appropriate sizing. Not a button: default cursor, no hover state,
+   doesn't act. */
+.fxm-action-menu__stats {
+  cursor: default;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 6px 10px;
+}
+
+.fxm-action-menu__stats-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fx-text);
+  margin-bottom: 3px;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.fxm-action-menu__stats-row {
+  font-size: 11.5px;
+  color: var(--fx-text-secondary);
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.fxm-action-menu__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--fx-border-strong);
+  flex: none;
+}
+
+/* "Recent performances" block (last5.js's fetched data, coarse-pointer/
+   touch only -- see action-menu.js's own comment; shown regardless of
+   whether the tapped player's own game has started yet).
+   Deliberately styled as SUPPORTING info, not the headline: smaller and
+   more muted than .fxm-action-menu__stats above it, and separated by a
+   thin top border + its own padding rather than a second full divider,
+   which would read as visually heavier than this block deserves next to
+   the main stats/actions. Sits inside the SAME scroll region as
+   .fxm-action-menu__stats when the menu overflows (no separate
+   max-height/overflow of its own -- it's a continuation of that block,
+   not an independent one). */
+.fxm-action-menu__last5 {
+  cursor: default;
+  padding: 6px 10px 4px;
+  margin-top: 2px;
+  border-top: 1px solid var(--fx-border);
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.fxm-action-menu__last5-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fx-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 3px;
+}
+
+/* Loading placeholder only -- swapped out (never toggled back on) by
+   action-menu.js's refreshLast5UI once last5.js's fetch resolves, so this
+   is a one-way transitional state, not a persistent style variant. */
+.fxm-action-menu__last5-title--loading {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--fx-text-faint);
+}
+
+.fxm-action-menu__last5-row {
+  font-size: 11px;
+  color: var(--fx-text-secondary);
+  line-height: 1.5;
+}
+
+/* Stand-in for the rows themselves when there aren't any: either the
+   player genuinely has no games on record yet, or the fetch failed (see
+   renderLast5Rows). Muted and italic so it reads as an explanation rather
+   than as a performance line with a missing number. */
+.fxm-action-menu__last5-row--muted {
+  color: var(--fx-text-faint);
+  font-style: italic;
+}

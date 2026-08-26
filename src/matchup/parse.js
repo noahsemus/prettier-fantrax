@@ -48,8 +48,19 @@
       ? primaryH2.textContent.replace(/Gameweek/i, '').replace(/\s+/g, '').trim()
       : '';
     const projected = secondaryEl ? secondaryEl.textContent.trim() : '';
+    // The team-name link's own href is Fantrax's real
+    // `/team/roster;teamId=<id>` URL -- confirmed live -- so this reads the
+    // team's Fantrax id straight off the DOM rather than guessing it from
+    // the (not-guaranteed-unique) team name. Used by render.js/fxpa.js's
+    // same-origin manager-username fetch (see fxpa.js's header comment for
+    // why that fetch exists at all); parse.js itself has no other use for
+    // it, but this is the ONE place that ever reads this href, so it lives
+    // here rather than being re-parsed elsewhere.
+    const href = nameA ? nameA.getAttribute('href') : null;
+    const teamIdMatch = href ? href.match(/teamId=([^;&]+)/) : null;
     return {
       name: nameA ? nameA.textContent.trim() : '',
+      teamId: teamIdMatch ? teamIdMatch[1] : null,
       logo,
       live,
       projected,

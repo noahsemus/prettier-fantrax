@@ -1,12 +1,12 @@
 .fx-action-menu {
   position: fixed;
   z-index: 2147483647;
-  background: #12181f;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--fx-surface);
+  border: 1px solid var(--fx-border-strong);
   border-radius: 8px;
   padding: 4px;
   min-width: 160px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--fx-shadow);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   display: flex;
   flex-direction: column;
@@ -17,7 +17,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #f5f7fa;
+  color: var(--fx-text);
   font-size: 12.5px;
   text-align: left;
   padding: 8px 10px;
@@ -26,16 +26,16 @@
 }
 
 .fx-action-menu__item:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--fx-surface-hover);
 }
 
 .fx-action-menu__item--danger {
-  color: #ff8a80;
+  color: var(--fx-stat-neg);
 }
 
 .fx-action-menu__item--disabled,
 .fx-action-menu__item:disabled {
-  color: #5b6472;
+  color: var(--fx-text-faint);
   cursor: not-allowed;
 }
 
@@ -52,7 +52,7 @@
 .fx-action-menu__stats-title {
   font-size: 12px;
   font-weight: 700;
-  color: #fff;
+  color: var(--fx-text);
   margin-bottom: 3px;
   white-space: normal;
   overflow-wrap: break-word;
@@ -60,7 +60,7 @@
 
 .fx-action-menu__stats-row {
   font-size: 11.5px;
-  color: #cfd6de;
+  color: var(--fx-text-secondary);
   line-height: 1.5;
   white-space: normal;
   overflow-wrap: break-word;
@@ -69,6 +69,57 @@
 .fx-action-menu__divider {
   height: 1px;
   margin: 4px 6px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--fx-border-strong);
   flex: none;
+}
+
+/* "Recent performances" block (src/shared/last5.js's fetched data,
+   coarse-pointer/touch only -- see action-menu.js, which also explains why
+   it's limited to players whose game hasn't kicked off yet). Styled as
+   SUPPORTING info below the stats block: smaller, more muted, and set off
+   by a thin top border rather than a second full divider, which would read
+   heavier than this block deserves. Mirrors matchup's own
+   .fxm-action-menu__last5 rules exactly, per this codebase's
+   shared-logic/own-feature-scoped-CSS convention. */
+.fx-action-menu__last5 {
+  cursor: default;
+  padding: 6px 10px 4px;
+  margin-top: 2px;
+  border-top: 1px solid var(--fx-border);
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.fx-action-menu__last5-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fx-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 3px;
+}
+
+/* Loading placeholder only -- swapped out (never toggled back on) by
+   refreshLast5UI once the fetch resolves, so this is a one-way
+   transitional state, not a persistent style variant. */
+.fx-action-menu__last5-title--loading {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--fx-text-faint);
+}
+
+.fx-action-menu__last5-row {
+  font-size: 11px;
+  color: var(--fx-text-secondary);
+  line-height: 1.5;
+}
+
+/* Stands in for the rows when there aren't any: either no games on record
+   yet, or a failed fetch (see renderLast5Rows). Muted and italic so it
+   reads as an explanation, not as a performance line missing its number. */
+.fx-action-menu__last5-row--muted {
+  color: var(--fx-text-faint);
+  font-style: italic;
 }

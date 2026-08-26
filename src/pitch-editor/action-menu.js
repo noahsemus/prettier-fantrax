@@ -97,6 +97,113 @@
     return section;
   }
 
+  // ---------- "Recent performances" (src/shared/last5.js) ----------
+  // The same block matchup's action menu carries, built on the SAME shared
+  // module (src/shared/last5.js), so both features share one league-wide
+  // scorerId lookup per page load and one cache -- see that file's own
+  // comment for exactly how far the per-player sharing goes.
+  //
+  // Shown only for players whose game hasn't kicked off yet (roster.js
+  // sets `locked` when the opp cell no longer carries a clock time, i.e.
+  // the game has started or finished). On a FUTURE gameweek that's the
+  // whole squad, which is the case the user asked for -- and on the
+  // current one it keeps showing form for players still to play, exactly
+  // when "should I start them?" is the live question, while staying out of
+  // the way for players whose points are already real and on the card.
+  //
+  // Fantrax's scorerMap is league-wide, so resolving an abbreviated card
+  // name ("M. Sangaré") is disambiguated by the fantasy team that owns the
+  // player -- here, whichever team's roster is on screen, read off the
+  // URL's own `teamId` matrix param. That param is absent when Fantrax
+  // renders your own default roster, in which case this passes null and
+  // last5.js falls back to its league-wide unique-match rule (which still
+  // refuses rather than guessing when two players genuinely collide).
+  function rosterTeamId() {
+    const m = /[;&?]teamId=([^;&?]+)/.exec(location.href);
+    return m ? m[1] : null;
+  }
+
+  function formatSigned(text) {
+    const n = parseFloat(text);
+    return n > 0 ? `+${text}` : text;
+  }
+
+  function formatRecentOpponent(oppText) {
+    const trimmed = (oppText || '').trim();
+    if (!trimmed) return '';
+    if (trimmed.charAt(0) === '@') return `@ ${trimmed.slice(1).trim()}`;
+    return `vs ${trimmed}`;
+  }
+
+  // Three outcomes, three renderings -- never a silently absent section.
+  // `rows === null` is a failed fetch (last5.js throws rather than caching
+  // Fantrax's rate-limit response, so re-tapping genuinely does retry); an
+  // empty array is a player with no games on record yet. Mirrors matchup's
+  // renderLast5Rows exactly.
+  function buildLast5Message(text) {
+    const row = document.createElement('div');
+    row.className = 'fx-action-menu__last5-row fx-action-menu__last5-row--muted';
+    row.textContent = text;
+    return row;
+  }
+
+  function renderLast5Rows(rows) {
+    const nodes = [];
+    const title = document.createElement('div');
+    title.className = 'fx-action-menu__last5-title';
+    title.textContent = 'Recent performances';
+    nodes.push(title);
+    if (!rows) {
+      nodes.push(buildLast5Message('Couldn’t load — tap again to retry'));
+      return nodes;
+    }
+    if (!rows.length) {
+      nodes.push(buildLast5Message('No games played yet'));
+      return nodes;
+    }
+    rows.forEach((g) => {
+      const row = document.createElement('div');
+      row.className = 'fx-action-menu__last5-row';
+      const ptsText = g.fpts !== '' && g.fpts != null ? formatSigned(g.fpts) : '0';
+      const oppText = formatRecentOpponent(g.opponent) || g.date || '';
+      FXShared.renderStatLine(row, { text: oppText, pts: ptsText });
+      nodes.push(row);
+    });
+    return nodes;
+  }
+
+  // Re-renders into WHATEVER menu is currently open rather than a captured
+  // element, and only if it's still this player's -- by the time the fetch
+  // resolves the user may have tapped someone else, and painting one
+  // player's form into another's menu is exactly the bug that guard
+  // prevents. The roster's menu is only ever open for one card at a time
+  // (state.actionMenuPlayerKey, set in openActionMenu).
+  function refreshLast5UI(playerKey, rows) {
+    if (!state.actionMenuEl || state.actionMenuPlayerKey !== playerKey) return;
+    const container = state.actionMenuEl.querySelector('.fx-action-menu__last5');
+    if (!container) return;
+    container.innerHTML = '';
+    renderLast5Rows(rows).forEach((n) => container.appendChild(n));
+  }
+
+  function buildLast5Section(p) {
+    if (p.isEmpty || p.locked) return null; // already played -- the real number is on the card
+    const teamId = rosterTeamId();
+    const container = document.createElement('div');
+    container.className = 'fx-action-menu__last5';
+    const cached = FXShared.peekLast5(p.name, teamId);
+    if (cached !== undefined) {
+      renderLast5Rows(cached).forEach((n) => container.appendChild(n));
+    } else {
+      const loading = document.createElement('div');
+      loading.className = 'fx-action-menu__last5-title fx-action-menu__last5-title--loading';
+      loading.textContent = 'Recent performances: loading…';
+      container.appendChild(loading);
+      FXShared.getLast5(p.name, teamId).then((rows) => refreshLast5UI(p.key, rows));
+    }
+    return container;
+  }
+
   function onDocClick(e) {
     if (state.actionMenuEl && !state.actionMenuEl.contains(e.target)) closeActionMenu();
   }
@@ -110,6 +217,7 @@
       state.actionMenuEl.remove();
       state.actionMenuEl = null;
     }
+    state.actionMenuPlayerKey = null;
     // Single choke point for every close path (tap-outside via onDocClick,
     // Escape via onKeydown, or picking a menu item) -- tearing down the
     // scroll-tracker and clearing the tap-select dimming here means none
@@ -143,10 +251,20 @@
     menu.className = 'fx-action-menu';
     const coarse = isCoarsePointer();
 
+    // Tracked so refreshLast5UI can tell whether the menu that's open when
+    // a fetch resolves is still the one that started it.
+    state.actionMenuPlayerKey = p.key;
+
     if (coarse) {
       const statsSection = buildStatsSection(p);
-      if (statsSection) {
-        menu.appendChild(statsSection);
+      if (statsSection) menu.appendChild(statsSection);
+      // Recent form sits under the stats block as supporting info (same
+      // ordering and reasoning as matchup's menu), and only one divider
+      // goes in above the buttons regardless of which of the two
+      // read-only sections are present.
+      const last5Section = buildLast5Section(p);
+      if (last5Section) menu.appendChild(last5Section);
+      if (statsSection || last5Section) {
         const divider = document.createElement('div');
         divider.className = 'fx-action-menu__divider';
         menu.appendChild(divider);

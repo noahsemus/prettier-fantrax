@@ -30,14 +30,17 @@
  *
  * render() tears down and rebuilds EVERY `.fxm-card` node on every
  * re-render, and this livescoring page's own DOM mutations (live score
- * updates) trigger that rebuild often via the MutationObserver in main.js
- * -- including while a player is tap-selected (dimmed + tooltip open) on
- * touch. Tracking WHO is selected by identity (state.selectedIdentity,
- * not a DOM node reference -- see state.js) rather than just a stale
- * `tooltipTargetEl` lets render() re-locate that same player's freshly
- * built card and re-apply the dim/tooltip there (reapplySelection, called
- * at the end of render()) instead of the selection silently reverting
- * within about a second of a live-score-driven re-render.
+ * updates) trigger that rebuild often via the MutationObserver in main.js.
+ * The hover tooltip (desktop only, see attachHoverTooltip below) copes with
+ * that for free: it follows the live cursor position rather than anchoring
+ * to a specific card element, and removing the hovered card from the DOM
+ * mid-render fires its `mouseleave` (hiding the tooltip) same as actually
+ * moving the mouse off it would. Tapping a card on touch no longer opens
+ * this tooltip at all -- see action-menu.js, which owns the per-player
+ * action menu (stats + real controls) that replaced it there, and closes
+ * itself outright (rather than re-anchoring) if ITS card goes stale
+ * mid-render -- see that file's own comment on why the simpler behavior is
+ * enough for it.
  * ---------------------------------------------------------------------
  */
 (function (FXM) {
@@ -69,13 +72,15 @@
     return node;
   }
 
-  // ---------- hover breakdown tooltip ----------
+  // ---------- hover breakdown tooltip (desktop only) ----------
   // Mirrors pitch-editor/tooltip.js's mechanics exactly (fixed-position
   // singleton div, mouseenter/mousemove/mouseleave, viewport-edge
   // flipping) under our own `fxm-` classes so it doesn't collide with
   // pitch-editor's `.fx-card-tip`. Wired onto both pitch (starter) cards
   // and bench cards via attachHoverTooltip, called from renderCard itself
   // so every place a card gets built (line or bench) gets hover for free.
+  // Touch never shows this any more -- see attachHoverTooltip's own tap
+  // wiring below, which opens action-menu.js's menu instead.
 
   function ensureTooltip() {
     if (state.tooltipEl && document.body.contains(state.tooltipEl)) return state.tooltipEl;
@@ -93,11 +98,6 @@
   // color-coded span) is FXShared.renderStatLine, shared with
   // pitch-editor's tooltip/action-menu stat lines -- see
   // src/shared/touch-overlay.js.
-  //
-  // Shared by both the mouse (showTooltip) and touch (showTooltipForCard)
-  // paths -- building the row DOM is identical either way, only how the
-  // tip then gets POSITIONED differs (raw cursor coords vs. anchored to a
-  // card element), so that split lives one level up, not duplicated here.
   function renderTooltipContent(lines) {
     const tip = ensureTooltip();
     tip.innerHTML = '';
@@ -133,97 +133,17 @@
     tip.style.top = `${Math.max(4, top)}px`;
   }
 
-  // Touch path -- see showTooltipForCard below for why this anchors to the
-  // CARD element's rect instead of a raw touch point.
-  const TIP_CARD_GAP = 8; // px gap kept between the tip and its anchor card
   // Net finger movement (px) between touchstart and touchend on a card
   // under which a touchend still counts as a tap rather than the tail end
-  // of a scroll -- see attachHoverTooltip's FXShared.onTap wiring. Same
-  // value and same idea as pitch-editor/drag.js's TOUCH_MOVE_CANCEL_PX.
+  // of a scroll -- see attachHoverTooltip's FXShared.onTap wiring (now
+  // gating whether a tap opens action-menu.js's menu, not this tooltip --
+  // see that function's own comment). Same value and same idea as
+  // pitch-editor/drag.js's TOUCH_MOVE_CANCEL_PX.
   const TOUCH_TAP_MOVE_PX = 10;
-
-  // Touch has no hover, so a tap anchors the tip to the CARD it just
-  // tapped rather than to the touch point (positionTooltip above) -- a
-  // tapped card is itself ~58-76px, so an offset-from-finger tip routinely
-  // landed right on top of it. FXShared.anchorToElement (src/shared/
-  // touch-overlay.js) owns the flush-above/below + viewport-clamp math --
-  // the exact algorithm this file originally had inline, now shared with
-  // pitch-editor's action menu. Registering with FXShared.trackAnchor
-  // keeps the tip "stuck" to the card through a scroll (re-anchoring on
-  // every scroll event) and hides it via hideTooltip if the card ever goes
-  // stale -- detached from the document because render()'s
-  // MutationObserver-driven re-renders tear down and rebuild EVERY
-  // `.fxm-card` node from scratch (see render()'s own comment), which can
-  // happen from Fantrax's own live-updating page content with no user
-  // action at all. Keyed 'fxm' so this tracker can't collide with
-  // pitch-editor's own 'fxp'-keyed action-menu tracker.
-  function showTooltipForCard(lines, cardEl) {
-    if (!lines || !lines.length) return;
-    renderTooltipContent(lines);
-    state.tooltipTargetEl = cardEl;
-    const reposition = () => FXShared.anchorToElement(state.tooltipEl, cardEl, { gap: TIP_CARD_GAP, margin: 8 });
-    reposition();
-    FXShared.trackAnchor('fxm', {
-      overlayEl: state.tooltipEl,
-      targetEl: cardEl,
-      isVisible: () => !!(state.tooltipEl && state.tooltipEl.classList.contains('fxm-tip--visible')),
-      onReposition: reposition,
-      onStale: hideTooltip,
-    });
-  }
 
   function hideTooltip() {
     if (state.tooltipEl) state.tooltipEl.classList.remove('fxm-tip--visible');
     state.hoveredName = null;
-    state.tooltipTargetEl = null;
-    FXShared.stopTrackingAnchor('fxm');
-    // Single choke point for every close path (toggle-close, tap-outside via
-    // onOutsideTap, mouseleave, and the stale-target scroll-hide via
-    // FXShared.trackAnchor's onStale above) -- clearing the tap-select
-    // dimming here means none of those callers need to remember to do it
-    // themselves. A no-op on desktop/mouse closes since setSelectedCard is
-    // only ever called from the touch tap path below, so there's nothing
-    // to clear.
-    clearSelectedCard();
-  }
-
-  // ---------- touch tap-select dimming ----------
-  // Touch-only "which card did I just tap" affordance: dims every OTHER
-  // `.fxm-card` (pitch and bench, both teams) so the tapped player reads
-  // unambiguously against the rest of the pitch. Deliberately NOT wired off
-  // desktop mouseenter -- that would dim the whole pitch on every hover,
-  // a much more intrusive change to already-established hover behavior.
-  // Scoped to state.container (falling back to the whole document if the
-  // container ever isn't set) rather than a fixed root, since it must reach
-  // both teams' halves and both benches, which live in the same body.
-  //
-  // The dim mechanic itself (FXShared.selectAndDim/clearDim) is shared with
-  // pitch-editor's roster dimming -- purely mechanical class add/remove, so
-  // `.fxm-card--dimmed` keeps its own name and its own CSS in matchup.css.
-  // `.fxm-card--selected` carries no styling of its own (see matchup.css) --
-  // kept as a plain DOM hook local to this feature, not part of the shared
-  // module's contract.
-  //
-  // Also the ONE place state.selectedIdentity gets set/cleared (from the
-  // card's own dataset -- see renderCard's data-side/data-bench/data-name)
-  // -- see state.js's comment on why identity, not just a DOM ref, is
-  // tracked. render()'s reapplySelection call below re-invokes this same
-  // function on the freshly-rebuilt card, which is a harmless no-op
-  // re-derivation of the same identity.
-  function setSelectedCard(cardEl) {
-    const root = state.container || document;
-    FXShared.selectAndDim(root, '.fxm-card', cardEl, 'fxm-card--dimmed');
-    FXM.qa('.fxm-card', root).forEach((c) => c.classList.toggle('fxm-card--selected', c === cardEl));
-    state.selectedIdentity = cardEl
-      ? { side: cardEl.dataset.side || null, isBench: cardEl.dataset.bench === '1', name: cardEl.dataset.name || null }
-      : null;
-  }
-
-  function clearSelectedCard() {
-    const root = state.container || document;
-    FXShared.clearDim(root, '.fxm-card', 'fxm-card--dimmed');
-    FXM.qa('.fxm-card', root).forEach((c) => c.classList.remove('fxm-card--selected'));
-    state.selectedIdentity = null;
   }
 
   // Touch has no real hover -- mouseenter/mouseleave (attachHoverTooltip
@@ -482,7 +402,7 @@
     return [...statusLine, "No stats yet — hasn't played"];
   }
 
-  function attachHoverTooltip(card, p) {
+  function attachHoverTooltip(card, p, side) {
     card.addEventListener('mouseenter', (e) => {
       state.hoveredName = p.name;
       state.lastMouseX = e.clientX;
@@ -498,27 +418,32 @@
     });
     card.addEventListener('mouseleave', hideTooltip);
 
-    // Tap-to-TOGGLE on touch devices. Without this, a tap is indistinguishable
-    // from a mouseenter above (an unprevented touch gesture makes the browser
-    // synthesize mouseenter/mousemove/click right after it), which can only
-    // ever OPEN or reposition the tooltip -- there's no mouseleave-equivalent
-    // to close it on a second tap of the SAME card, since touch has no
-    // pointer to "leave" with. This handler owns the whole tap gesture
-    // instead: calling preventDefault in touchend (when the event is
-    // cancelable -- see below) suppresses that synthetic mouse-event chain
-    // (well-established behavior -- preventDefault on touchstart OR touchend
-    // blocks the compatibility mouse events for that gesture), so mouseenter
-    // above never even fires for a tap and this is the ONLY logic that runs.
-    // Desktop mouseenter/mousemove/mouseleave above are untouched --
-    // touchend simply never fires for a real mouse.
-    //
-    // Anchored to the CARD, not the touch point: unlike the mouse path
-    // (which follows the live cursor and so is never mistaken for covering
-    // the pointed-at element), a tap's x/y IS the card the user just
-    // touched -- offsetting a fixed amount from it routinely put the tip
-    // right on top of the card. showTooltipForCard positions off the
-    // card's own rect instead (via FXShared.anchorToElement), and tracks it
-    // through scroll via FXShared.trackAnchor.
+    // Desktop (fine-pointer) click -- opens action-menu.js's per-player
+    // menu at the click coordinates, action buttons only (no stats section:
+    // the hover tooltip above already covers that on desktop). Mirrors
+    // pitch-editor's plain `click` listener (drag.js) exactly; matchup has
+    // no drag/swap system competing for this card's click, so there's no
+    // "armed" branching to do here -- every desktop click just (re)opens
+    // the menu for whichever card it landed on. A touch tap's synthetic
+    // click is already suppressed by FXShared.onTap's preventDefault below,
+    // so in practice this only ever fires for a real mouse.
+    card.addEventListener('click', (e) => {
+      FXM.openActionMenu(card, p, side, e.clientX, e.clientY);
+    });
+
+    // Tap on touch devices -- opens the SAME action menu, but with a
+    // read-only stats section prepended (action-menu.js's own
+    // buildStatsSection, built from THIS file's buildTooltipLines) since
+    // touch has no hover and would otherwise never see those numbers. This
+    // REPLACES the old tap-to-toggle tooltip entirely: touch never shows
+    // `.fxm-tip` any more, only the menu (see FXM.openActionMenu's own
+    // isCoarsePointer() branch). Preserved from that old behavior: calling
+    // preventDefault in touchend (when the event is cancelable -- see
+    // below) suppresses the browser's synthetic mouseenter/mousemove/click
+    // chain that would otherwise follow an unprevented tap, so the desktop
+    // mouseenter/click listeners above never fire for a tap and this is the
+    // ONLY logic that runs. Desktop mouseenter/mousemove/mouseleave/click
+    // above are untouched -- touchend simply never fires for a real mouse.
     //
     // The tap-vs-scroll gesture gating (net finger movement under
     // TOUCH_TAP_MOVE_PX between touchstart and touchend, cancelable-safe
@@ -527,22 +452,12 @@
     // anything else that needs "was this touchend a real tap." Not the
     // same concern as pitch-editor/drag.js's own long-press-vs-scroll state
     // machine (that one decides whether to START A DRAG); this one decides
-    // whether to open/toggle the tooltip.
+    // whether to open the menu at all.
     FXShared.onTap(
       card,
-      () => {
-        const alreadyOpenHere =
-          state.tooltipEl && state.tooltipEl.classList.contains('fxm-tip--visible') && state.hoveredName === p.name;
-        if (alreadyOpenHere) {
-          hideTooltip();
-          return;
-        }
-        state.hoveredName = p.name;
-        showTooltipForCard(buildTooltipLines(p), card);
-        // Dim every other card so it's unambiguous which player this tip
-        // belongs to. Touch-tap path only (see setSelectedCard) -- desktop
-        // hover intentionally leaves every other card alone.
-        setSelectedCard(card);
+      (e) => {
+        const t = e.changedTouches && e.changedTouches[0];
+        FXM.openActionMenu(card, p, side, t ? t.clientX : 0, t ? t.clientY : 0);
       },
       { moveThresholdPx: TOUCH_TAP_MOVE_PX }
     );
@@ -571,15 +486,37 @@
   function renderCard(p, extraClass, side) {
     const isBench = extraClass === 'fxm-card--bench';
     const card = el('div', extraClass ? `fxm-card ${extraClass}` : 'fxm-card');
-    // Identity attributes, not just for marqueeKey (below) any more --
-    // render()'s reapplySelection also reads these back off the FRESHLY
-    // rebuilt card to re-locate whichever player was tap-selected before a
-    // live-score-driven rebuild tore the old node out from under it. Same
-    // side:isBench:name shape as marqueeKey, so the two stay in lockstep.
+    // Identity attributes -- same side:isBench:name shape as marqueeKey
+    // (below). Also what action-menu.js's reapplyActionMenu re-locates a
+    // card by after a rebuild, and what the `--menu-selected` check right
+    // below reads back on THIS same freshly-built card.
     if (p.name) {
       card.dataset.side = side || '';
       card.dataset.bench = isBench ? '1' : '0';
       card.dataset.name = p.name;
+
+      // Marks the ONE card action-menu.js's menu is currently anchored to
+      // (state.actionMenuIdentity, set by openActionMenu -- see its own
+      // comment) so matchup.css's `.fxm-matchup--menu-open .fxm-card`
+      // dimming rule can exempt it via `.fxm-card--menu-selected`, checked
+      // right here at CREATION time -- before this card is ever inserted
+      // into the document. That timing is the whole fix for a "flicker"
+      // bug: render() tears down and rebuilds EVERY `.fxm-card` node on
+      // every re-render (matchup's live-score updates trigger that often,
+      // sometimes multiple times a second), and the previous approach
+      // (JS looping over cards AFTER each render to toggle a `--dimmed`
+      // class) let every fresh batch of cards paint one full frame
+      // completely undimmed before catching up a tick later -- a constant,
+      // visible flash on every OTHER player's card, confirmed live. Doing
+      // the check here instead means a freshly-created non-selected card's
+      // very FIRST paint is already dimmed (no class to add after the
+      // fact, matchup.css's descendant selector just applies), and the
+      // selected card's very first paint is already exempted -- there's no
+      // "before" frame for either one to flash through.
+      const identity = state.actionMenuIdentity;
+      if (identity && identity.side === (side || '') && identity.isBench === isBench && identity.name === p.name) {
+        card.classList.add('fxm-card--menu-selected');
+      }
     }
     const constructed = jerseyFromCrest(p.crest, p.pos);
     const jerseySrc = constructed || p.crest;
@@ -677,7 +614,7 @@
     // Skip hover wiring on empty slots -- parse.js never actually hands us
     // one (parseSide returns null and callers skip it), but guard on p.name
     // anyway so this stays correct if that ever changes.
-    if (p.name) attachHoverTooltip(card, p);
+    if (p.name) attachHoverTooltip(card, p, side);
     return card;
   }
 
@@ -788,6 +725,12 @@
     // 'opp:'-prefixed key namespace (see renderCard/marqueeKey) so it can't
     // collide with that same card's name entry above.
     applyMarqueeToSet(root, '.fxm-card__opp', '.fxm-card__opp-text', 'fxm-card__opp--marquee', nextStarts, now);
+    // Team header manager-username line (renderTeamHeader) -- own
+    // 'owner:'-prefixed key namespace, disjoint from 'header:' (team name)
+    // above for the same team. Usernames are typically short (no spaces),
+    // so this rarely if ever actually overflows, but the mechanism is
+    // there for the unusual long one rather than silently clipping it.
+    applyMarqueeToSet(root, '.fxm-team-header__owner', '.fxm-team-header__owner-text', 'fxm-team-header__owner--marquee', nextStarts, now);
 
     // Drop start times for any key not touched this render (player no
     // longer overflowing, subbed out, or a different matchup entirely) so
@@ -840,6 +783,26 @@
     nameEl.appendChild(el('span', 'fxm-team-header__name-text', side.header.name || ''));
     top.appendChild(nameEl);
     header.appendChild(top);
+    // Manager username, e.g. "noahsemus" -- NOT present anywhere in this
+    // header's own DOM (confirmed live; see fxpa.js's header comment), so
+    // this only renders once ensureOwnersFetched (called from render(),
+    // which has both teams' ids in scope) has a cached value for THIS
+    // team's id. A header built before that resolves simply has no owner
+    // line at all -- no "loading" placeholder -- since the fetch already
+    // covers both teams in one request kicked off at the top of render(),
+    // and typically resolves well before the next re-render (matchup's own
+    // live-score churn) rebuilds this header anyway; ensureOwnersFetched's
+    // own .then triggers exactly one extra FXM.render() call once it
+    // settles, so the very next header built after that already has it
+    // from its first paint -- same "born with the right content, no flash"
+    // principle as the dimming fix (matchup.css/action-menu.js).
+    const ownerName = side.header.teamId ? state.ownerCache.get(side.header.teamId) : null;
+    if (ownerName) {
+      const ownerEl = el('div', 'fxm-team-header__owner');
+      ownerEl.dataset.marqueeKey = `owner:${key}`;
+      ownerEl.appendChild(el('span', 'fxm-team-header__owner-text', ownerName));
+      header.appendChild(ownerEl);
+    }
     const scores = el('div', 'fxm-team-header__scores');
     scores.appendChild(el('span', 'fxm-team-header__live', side.header.live || '-'));
     scores.appendChild(el('span', 'fxm-team-header__projected', `proj ${side.header.projected || '-'}`));
@@ -943,56 +906,6 @@
 
   // ---------- container + top-level render ----------
 
-  // Looks up the player object matching a state.selectedIdentity (see
-  // state.js) inside `data`, the same parsed structure renderField/
-  // renderBenchSide just built the fresh cards from -- so if a card with
-  // that identity exists in the just-rendered DOM, this is guaranteed to
-  // find its matching player object too. Used by reapplySelection below.
-  function findPlayerByIdentity(data, identity) {
-    if (!identity) return null;
-    const sideData = data[identity.side];
-    if (!sideData) return null;
-    const list = identity.isBench ? sideData.reserves : FXM.POS_ORDER.flatMap((pos) => sideData.starters[pos]);
-    return list.find((p) => p.name === identity.name) || null;
-  }
-
-  // Re-locates the tap-selected player (if any) among the cards render()
-  // JUST rebuilt, and re-applies the dim + tooltip there -- see state.js's
-  // comment on state.selectedIdentity for why this exists: render() tears
-  // down and rebuilds every `.fxm-card` node on every re-render, and this
-  // livescoring page's own DOM mutations trigger that rebuild often (a
-  // MutationObserver in main.js reacts to Fantrax's live score updates),
-  // including while a player is tap-selected. Without this, the dimming
-  // and tooltip would revert to "nothing selected" within ~1s of a tap --
-  // reads as the selection mysteriously undoing itself, even though the
-  // user didn't touch anything.
-  //
-  // Found: re-select + re-dim (setSelectedCard), then re-render the
-  // tooltip's content AND re-anchor/re-track it via showTooltipForCard --
-  // reusing that function (rather than only repositioning) means the
-  // scroll-tracker's targetEl also gets updated to the new node, and the
-  // stat lines reflect this render's freshest data, exactly as if the user
-  // had just tapped the new card themselves.
-  //
-  // Not found (player genuinely no longer in the lineup/data at all -- a
-  // real edge case, e.g. a sub) -- close the tooltip and clear the
-  // identity, same as any other stale-target close (mirrors
-  // FXShared.trackAnchor's onStale handling for the scroll path).
-  function reapplySelection(data, root) {
-    const identity = state.selectedIdentity;
-    if (!identity) return;
-    const match = qa('.fxm-card', root).find(
-      (c) => c.dataset.side === identity.side && (c.dataset.bench === '1') === identity.isBench && c.dataset.name === identity.name
-    );
-    const p = match && findPlayerByIdentity(data, identity);
-    if (!match || !p) {
-      hideTooltip();
-      return;
-    }
-    setSelectedCard(match);
-    showTooltipForCard(buildTooltipLines(p), match);
-  }
-
   function ensureContainer() {
     if (state.container && document.body.contains(state.container)) return state.container;
     const anchor = document.querySelector('league-livescoring-standard-table');
@@ -1017,15 +930,60 @@
     return wrapper;
   }
 
+  // Ensures a same-origin fetch is in flight (or already resolved) for
+  // BOTH teams' manager usernames in `data`, batched into ONE request when
+  // both are missing (mirrors the real Fantrax app batching multiple
+  // `getTeamRosterInfo` calls together) -- see fxpa.js's header comment for
+  // why this fetch exists at all, and state.js's ownerCache/ownerInflight
+  // comments for the caching contract. Schedules exactly one FXM.render()
+  // re-run once the fetch settles (success populates ownerCache; failure
+  // is swallowed -- console.warn only, header just stays as it is today,
+  // per the user's own "no error UI" ask) so the newly-known username(s)
+  // show up on the very next header build. Calling FXM.render() directly
+  // here (rather than main.js's debounced scheduleRender) is the same
+  // pattern render()/reapplyActionMenu/boot() already use elsewhere in
+  // this codebase -- main.js's MutationObserver recognizes the resulting
+  // DOM changes as "own" (isOwnMutation/isOwnNode) and won't reschedule
+  // again, so there's no render loop risk.
+  function ensureOwnersFetched(data) {
+    const ids = [data.home.header.teamId, data.away.header.teamId].filter(Boolean);
+    const need = ids.filter((id) => !state.ownerCache.has(id) && !state.ownerInflight.has(id));
+    if (!need.length) return;
+
+    const leagueId = FXShared.fxpaLeagueId();
+    const promise = FXShared.fxpaRequest(need.map((teamId) => ({ method: 'getTeamRosterInfo', data: { leagueId, teamId } })))
+      .then((json) => {
+        (json.responses || []).forEach((r, i) => {
+          const info = r && r.data && r.data.teamHeadingInfo;
+          const value = info && info.owners && info.owners.value;
+          state.ownerCache.set(need[i], value || '');
+        });
+        render();
+      })
+      .catch((err) => {
+        console.warn('[fx-owner] failed to fetch team manager username(s)', err);
+        // Not cached on failure -- the next render() (live-score churn
+        // will trigger one soon regardless) sees these ids still missing
+        // from both maps and retries.
+      })
+      .finally(() => {
+        need.forEach((id) => state.ownerInflight.delete(id));
+      });
+    need.forEach((id) => state.ownerInflight.set(id, promise));
+  }
+
   function render() {
     const data = FXM.parseMatchup();
     if (!data) {
       // Mobile matchup LIST view, or Teams/Scores tabs -- remove our
       // container silently rather than showing a stale/empty pitch. Also
-      // close any open tooltip/selection (hideTooltip clears
-      // state.selectedIdentity via clearSelectedCard) -- the tooltip lives
-      // at document.body, not inside state.container, so it wouldn't
-      // otherwise be cleaned up by the container removal above.
+      // close any open tooltip -- it lives at document.body, not inside
+      // state.container, so it wouldn't otherwise be cleaned up by the
+      // container removal below. (The action menu doesn't need the same
+      // treatment: closeActionMenu is driven by reapplyActionMenu's own
+      // "player not found" branch, which this same FXM.parseMatchup()
+      // returning null would also trigger the next time a menu is open and
+      // a render happens -- see action-menu.js.)
       hideTooltip();
       if (state.container) {
         state.container.remove();
@@ -1038,6 +996,18 @@
 
     const container = ensureContainer();
     if (!container) return;
+
+    // Kick off (if needed) the manager-username lookup for both teams in
+    // this matchup, before headers are built below -- see
+    // renderTeamHeader's own comment for the "born with the right content"
+    // timing this is designed around. ensureOwnersFetched no-ops
+    // immediately if both are already cached (the common case after the
+    // very first render of a given matchup) or already in flight.
+    ensureOwnersFetched(data);
+    // Refreshed every render (cheap) -- see state.js's own comment on why
+    // action-menu.js's last-5 lookup needs this.
+    state.homeTeamId = data.home.header.teamId;
+    state.awayTeamId = data.away.header.teamId;
 
     if (state.bodyEl) state.bodyEl.remove();
     const body = el('div', 'fxm-body');
@@ -1054,11 +1024,31 @@
     body.appendChild(renderBenchSide(data.away.reserves, 'fxm-bench--away', 'away'));
     container.appendChild(body);
     state.bodyEl = body;
-    reapplySelection(data, body);
+    // Re-anchors an open action menu (action-menu.js) to this player's
+    // freshly-rebuilt card, if one is open -- see state.js's
+    // actionMenuIdentity comment for why this is needed on every render(),
+    // not just on a scroll-driven stale check.
+    FXM.reapplyActionMenu(data, body);
     requestAnimationFrame(() => applyNameMarquee(body));
   }
 
   FXM.jerseyFromCrest = jerseyFromCrest;
   FXM.ensureContainer = ensureContainer;
   FXM.render = render;
+  // Consumed by action-menu.js: hideTooltip closes the hover tooltip before
+  // the menu takes over (mirrors pitch-editor's FXP.hideCardTip), and
+  // buildTooltipLines is reused verbatim to build the menu's own read-only
+  // stats section on touch -- one set of breakdown lines, shown either in
+  // the hover tooltip (desktop) or the action menu (touch), never
+  // duplicated.
+  FXM.hideTooltip = hideTooltip;
+  FXM.buildTooltipLines = buildTooltipLines;
+  // Also consumed by action-menu.js's last-5-gameweeks block: gameState
+  // gates it to upcoming (not-yet-played) players only, same classification
+  // buildTooltipLines/renderCard already use for projection messaging;
+  // formatSigned turns a plain fpts string into the same "+N"/"N"/"-N"
+  // shape every OTHER stat line in this codebase already uses before
+  // handing it to FXShared.renderStatLine's pos/neg/zero coloring.
+  FXM.gameState = gameState;
+  FXM.formatSigned = formatSigned;
 })(window.FXM);

@@ -24,6 +24,12 @@ window.FXP = window.FXP || {};
     busy: false,
     tabActive: true, // pitch editor is the default sub-tab
     tabBtn: null,
+    // The <nav> our own tabBtn is appended into (findLineupSystemNav's
+    // "the SAME nav" -- see tabs.js). Stored so activateTab can toggle a
+    // marker class on it (CSS then neutralizes Fantrax's own
+    // `.pill--active` styling on Easy Click/Classic while it's set --
+    // see tabs.js's own comment for why this is needed at all).
+    tabNav: null,
 
     // last render's data, kept around so drag/arm interactions can look up
     // "is this other card a legal target" without re-scraping the page
@@ -32,6 +38,11 @@ window.FXP = window.FXP || {};
     dragSource: null, // player currently mid native-drag (null otherwise)
 
     actionMenuEl: null,
+    // Which player's card the open action menu belongs to (p.key), so a
+    // recent-performances fetch that resolves after the user has moved on
+    // paints into nothing instead of the wrong player's menu. Cleared by
+    // closeActionMenu alongside actionMenuEl. See action-menu.js.
+    actionMenuPlayerKey: null,
 
     // hover: how a player got their points (or their projection, if unplayed)
     breakdownCache: new Map(), // name -> { lines: [{abbr, label, text}] }
