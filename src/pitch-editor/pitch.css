@@ -5,7 +5,7 @@
   margin: 12px 0 18px;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--fx-border);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
@@ -13,9 +13,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #0e1116;
+  background: var(--fx-surface-sunken);
   padding: 8px 14px;
-  color: #f5f7fa;
+  color: var(--fx-text);
   font-size: 13px;
 }
 
@@ -189,13 +189,13 @@
 }
 
 .fx-bench {
-  background: #14181f;
+  background: var(--fx-surface);
   padding: 12px 14px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--fx-border);
 }
 
 .fx-bench__label {
-  color: #9aa4b2;
+  color: var(--fx-text-muted);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -210,13 +210,55 @@
 
 .fx-pitch__hint {
   padding: 6px 14px 10px;
-  background: #14181f;
-  color: #7c8794;
+  background: var(--fx-surface);
+  color: var(--fx-text-faint);
   font-size: 11px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--fx-border);
 }
 
 .fx-list-collapsed {
+  display: none !important;
+}
+
+/* Neutralizes Fantrax's OWN `.pill--active` styling on Easy Click/Classic
+   back to a plain (inactive) `.pill`'s look, but ONLY while our own
+   "Pitch Editor" pill is the active one -- tabs.js toggles
+   `fx-pitch-tab-mode-on` on the shared `<nav>` those pills live in (see
+   that file's header comment, fix #2, for the full "why": Fantrax's own
+   Angular keeps `.pill--active` on Easy Click regardless of whether our
+   tab is the one actually driving the view, so without this override BOTH
+   could visually read as active at once). Values are a literal copy of
+   the real page's own computed styles for an ACTIVE vs. an INACTIVE pill
+   (read live, not guessed): active is `rgba(54, 211, 153, 0.23)` background
+   / `rgb(165, 243, 207)` text; inactive is fully transparent background /
+   plain white text. `!important` because Fantrax's own `.pill--active`
+   rule is what this must win against. */
+.fx-pitch-tab-mode-on .pill--active {
+  background: rgba(0, 0, 0, 0) !important;
+  color: rgb(255, 255, 255) !important;
+}
+
+/* Fantrax's OWN native read-only pitch-view button -- a small green
+   icon-button (`mat-icon[svgicon="soccer_field"]`) next to the roster
+   page's Gameweek selector that opens a modal showing Fantrax's own
+   built-in read-only pitch graphic. Entirely superseded by this
+   extension's own pitch editor, so hidden as a redundant, confusing
+   second "show me the pitch" entry point -- hidden via CSS (never
+   removed/detached), same "Fantrax's own Angular owns this DOM, don't
+   fight it structurally" principle as `.fx-list-collapsed` above, so it
+   keeps re-hiding itself correctly however/whenever Fantrax re-renders
+   this button. Always hidden, not scoped to `fx-pitch-tab-mode-on` --
+   there's no Fantrax-native mode where this button is still useful once
+   our own pitch editor exists.
+   Confirmed live this does NOT break render.js's buildJerseyMap (which
+   reads jersey images out of the SAME widget this button opens,
+   `league-team-roster-pitch-view figure.pitch-view__player`): nothing in
+   this codebase ever opens that modal programmatically, so buildJerseyMap
+   was already relying on its own jerseyFromCrest (crest-derived) fallback
+   in every normal session before this button was ever hidden -- jerseys
+   still render correctly (verified live) since that fallback path is
+   completely unaffected by this button's visibility. */
+button:has(> mat-icon[svgicon="soccer_field"]) {
   display: none !important;
 }
 
@@ -233,13 +275,13 @@
   font-size: 13px;
   font-weight: 600;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  color: #cfd6de;
+  color: var(--fx-text-secondary);
   background: transparent;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .fx-pitch-tab:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--fx-surface-hover);
 }
 
 .fx-pitch-tab--active {

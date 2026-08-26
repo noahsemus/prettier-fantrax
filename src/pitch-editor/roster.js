@@ -88,8 +88,59 @@
     return text.split(',').map((s) => s.trim()).filter(Boolean);
   }
 
+  // ---------- column lookup by header text, not fixed index ----------
+  // The roster page's own view tabs (Simple/Stats/Fantasy Points/Trends/
+  // Schedule - Period/Schedule - Full/...) all render the SAME
+  // `.i-table__row` list but with a DIFFERENT set of `.i-table__cell`
+  // columns per view -- confirmed live across every one of them. Stats/
+  // Fantasy Points/Trends happen to share one layout (icon-buttons cell,
+  // then Opp, then FPts, at indices 1/2/3) -- which is exactly what this
+  // file used to hardcode as cells[2]/cells[3] -- but Simple has only 3
+  // columns total (no icon-buttons cell, so FPts sits at index 2, not 3),
+  // and Schedule - Period/Full have no single "Opp" column at all: the
+  // opponent/kickoff text is spread across one column PER DAY OF THE WEEK
+  // instead, with every day-column empty except whichever one that
+  // player's actual game falls on. Locating "Opp"/"FPts" by the header
+  // row's own text is what makes every view actually parse correctly
+  // instead of silently reading the wrong cell (or reading past the end
+  // of a shorter row) in every view except whichever one this was
+  // originally written against.
+  function getHeaderCells() {
+    const headerRow = qa('.i-table__row').find((r) => r.classList.contains('i-table__header'));
+    return headerRow ? qa(':scope > .i-table__cell', headerRow) : [];
+  }
+
+  function findColumnIndex(headerCells, label) {
+    return headerCells.findIndex((c) => c.textContent.trim() === label);
+  }
+
+  // Game/opponent text for one row. When the current view has a dedicated
+  // "Opp" column (Simple/Stats/Fantasy Points/Trends), that's the whole
+  // answer. Views with NO such column (Schedule - Period/Full) instead
+  // spread the same text across per-day-of-week columns -- scanning every
+  // cell for an upcoming-kickoff-time pattern finds it regardless of which
+  // day it falls on (a player has at most one game in view at a time, so
+  // at most one cell ever matches). `oppIdx` of -1 (findColumnIndex's own
+  // not-found value) means "this view has no Opp column" -- the signal
+  // that triggers the fallback scan.
+  function findGameText(cells, oppIdx) {
+    if (oppIdx !== -1 && cells[oppIdx]) return cells[oppIdx].textContent.replace(/\s+/g, ' ').trim();
+    const dayCell = cells.find((c) => /\d{1,2}:\d{2}\s*(am|pm)/i.test(c.textContent));
+    return dayCell ? dayCell.textContent.replace(/\s+/g, ' ').trim() : '';
+  }
+
   function parseRoster() {
     const rows = getListRows();
+    // See getHeaderCells/findColumnIndex/findGameText above for why these
+    // are looked up by the header row's own text rather than assumed at a
+    // fixed cells[2]/cells[3] -- confirmed live that the roster page's own
+    // view tabs (Simple/Stats/Fantasy Points/Trends/Schedule - Period/
+    // Schedule - Full/...) each lay the SAME `.i-table__row` out with a
+    // DIFFERENT set of columns. Computed once per call, not per row --
+    // the header doesn't change row to row.
+    const headerCells = getHeaderCells();
+    const oppIdx = findColumnIndex(headerCells, 'Opp');
+    const fptsIdx = findColumnIndex(headerCells, 'FPts');
     const emptyCounters = {};
     return rows.map((row) => {
       const btn = row.querySelector('button.lineup-btn');
@@ -98,8 +149,8 @@
       const name = nameA ? nameA.textContent.trim() : null;
       const isReserve = row.classList.contains('row--amber');
       const cells = qa(':scope > .i-table__cell', row);
-      const oppText = cells[2] ? cells[2].textContent.replace(/\s+/g, ' ').trim() : '';
-      const fptsText = cells[3] ? cells[3].textContent.replace(/\s+/g, ' ').trim() : '';
+      const oppText = findGameText(cells, oppIdx);
+      const fptsText = fptsIdx !== -1 && cells[fptsIdx] ? cells[fptsIdx].textContent.replace(/\s+/g, ' ').trim() : '';
       const img = row.querySelector('img');
       const crest = img ? img.src : readCrestFromFigure(row);
       const isEmpty = !name;
