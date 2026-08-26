@@ -269,9 +269,18 @@
   // cached rows immediately if last5.js already has them, otherwise a
   // "loading…" placeholder that refreshLast5UI (above) swaps out once the
   // fetch resolves. Mirrors buildStatsSection's own null-means-skip-me
-  // contract. No longer gated to gameState 'upcoming' -- see this
-  // section's own header comment for why.
+  // contract.
+  //
+  // Gated to players whose own game hasn't been played yet. On a
+  // HISTORICAL matchup every game is finished, and the most recent
+  // performance IS the game whose score is already on the card being
+  // tapped -- so the section just restated what the user was looking at,
+  // which read as a duplicate. Recent form answers "will they do
+  // anything?", a question that only exists before kickoff; afterwards
+  // the real number has replaced it. Same rule the roster's own menu
+  // uses (there via `locked`), so the two features behave alike.
   function buildLast5Section(p, side) {
+    if (FXM.gameState(p.gameText) !== 'upcoming') return null;
     const teamId = side === 'home' ? state.homeTeamId : state.awayTeamId;
     const container = document.createElement('div');
     container.className = 'fxm-action-menu__last5';

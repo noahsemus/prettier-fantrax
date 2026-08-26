@@ -133,6 +133,75 @@ window.FXShared = window.FXShared || {};
   // app build. Permission is requested lazily -- the first time there's
   // something real to say, rather than with a prompt on first launch for a
   // notification the user may never need.
+  // Its own Android channel, created at LOW importance: the notification
+  // lands silently in the shade -- no sound, no vibration, no heads-up
+  // banner interrupting whatever you're doing -- which is what you want
+  // from something that may fire while you're mid-something and is only
+  // worth acting on when you next look at your phone. Channel importance
+  // is fixed at creation time on Android and can't be lowered later in
+  // code, so this must be created BEFORE the first notification is
+  // scheduled on it (afterwards, only the user can change it in system
+  // settings). createChannel is a no-op if the channel already exists.
+  const CHANNEL_ID = 'fx-lineup-alerts';
+
+  function ensureChannel(plugin) {
+    if (!plugin.createChannel) return Promise.resolve(); // iOS has no channels
+    return plugin
+      .createChannel({
+        id: CHANNEL_ID,
+        name: 'Lineup alerts',
+        description: "Tells you when a player you're starting has been benched or left out by their real club.",
+        importance: 2, // LOW: shows in the shade, makes no sound
+        visibility: 1, // public: readable on the lock screen, where it's most useful
+        vibration: false,
+      })
+      .catch(() => {
+        /* older plugin or platform without channels -- schedule anyway */
+      });
+  }
+
+  // Never let a call hang this chain forever. Observed on-device: a
+  // schedule() naming a custom channel can sit unsettled indefinitely
+  // (the WebView suspending while the app is backgrounded will do it),
+  // and an alert that never resolves is an alert the user never gets.
+  function withTimeout(promise, ms) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          reject(new Error('timeout'));
+        }
+      }, ms);
+      Promise.resolve(promise).then(
+        (v) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(v);
+        },
+        (e) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          reject(e);
+        }
+      );
+    });
+  }
+
+  function buildNotification(problems, channelId) {
+    const notification = {
+      // A stable-ish id keeps a burst from stacking into a pile of
+      // near-identical notifications; Android requires a 32-bit int.
+      id: Math.floor(Date.now() / 1000) % 2147483647,
+      title: problems.length === 1 ? 'Lineup warning' : `${problems.length} lineup warnings`,
+      body: problems.map(describe).join('\n'),
+    };
+    if (channelId) notification.channelId = channelId;
+    return { notifications: [notification] };
+  }
+
   function notifyViaCapacitor(problems) {
     const cap = window.Capacitor;
     const plugin = cap && cap.Plugins && cap.Plugins.LocalNotifications;
@@ -141,17 +210,17 @@ window.FXShared = window.FXShared || {};
       .then(() => (plugin.requestPermissions ? plugin.requestPermissions() : { display: 'granted' }))
       .then((res) => {
         if (res && res.display && res.display !== 'granted') return null;
-        return plugin.schedule({
-          notifications: [
-            {
-              // A stable-ish id keeps a burst from stacking into a pile of
-              // near-identical notifications; Android requires a 32-bit int.
-              id: Math.floor(Date.now() / 1000) % 2147483647,
-              title: problems.length === 1 ? 'Lineup warning' : `${problems.length} lineup warnings`,
-              body: problems.map(describe).join('\n'),
-            },
-          ],
-        });
+        // Preferred path: our own silent, low-importance channel.
+        return withTimeout(
+          ensureChannel(plugin).then(() => plugin.schedule(buildNotification(problems, CHANNEL_ID))),
+          4000
+        ).catch(() =>
+          // Fallback: schedule with no channel at all, which lands on the
+          // plugin's default channel. Louder than we'd like, but GETTING
+          // the warning matters more than how quietly it arrives -- and
+          // this path is the one confirmed working on-device.
+          plugin.schedule(buildNotification(problems, null))
+        );
       })
       .catch(() => {
         /* denied or unavailable -- the in-page banner still shows */

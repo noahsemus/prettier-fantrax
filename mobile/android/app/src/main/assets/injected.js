@@ -1310,6 +1310,75 @@ window.FXShared = window.FXShared || {};
   // app build. Permission is requested lazily -- the first time there's
   // something real to say, rather than with a prompt on first launch for a
   // notification the user may never need.
+  // Its own Android channel, created at LOW importance: the notification
+  // lands silently in the shade -- no sound, no vibration, no heads-up
+  // banner interrupting whatever you're doing -- which is what you want
+  // from something that may fire while you're mid-something and is only
+  // worth acting on when you next look at your phone. Channel importance
+  // is fixed at creation time on Android and can't be lowered later in
+  // code, so this must be created BEFORE the first notification is
+  // scheduled on it (afterwards, only the user can change it in system
+  // settings). createChannel is a no-op if the channel already exists.
+  const CHANNEL_ID = 'fx-lineup-alerts';
+
+  function ensureChannel(plugin) {
+    if (!plugin.createChannel) return Promise.resolve(); // iOS has no channels
+    return plugin
+      .createChannel({
+        id: CHANNEL_ID,
+        name: 'Lineup alerts',
+        description: "Tells you when a player you're starting has been benched or left out by their real club.",
+        importance: 2, // LOW: shows in the shade, makes no sound
+        visibility: 1, // public: readable on the lock screen, where it's most useful
+        vibration: false,
+      })
+      .catch(() => {
+        /* older plugin or platform without channels -- schedule anyway */
+      });
+  }
+
+  // Never let a call hang this chain forever. Observed on-device: a
+  // schedule() naming a custom channel can sit unsettled indefinitely
+  // (the WebView suspending while the app is backgrounded will do it),
+  // and an alert that never resolves is an alert the user never gets.
+  function withTimeout(promise, ms) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          reject(new Error('timeout'));
+        }
+      }, ms);
+      Promise.resolve(promise).then(
+        (v) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(v);
+        },
+        (e) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          reject(e);
+        }
+      );
+    });
+  }
+
+  function buildNotification(problems, channelId) {
+    const notification = {
+      // A stable-ish id keeps a burst from stacking into a pile of
+      // near-identical notifications; Android requires a 32-bit int.
+      id: Math.floor(Date.now() / 1000) % 2147483647,
+      title: problems.length === 1 ? 'Lineup warning' : `${problems.length} lineup warnings`,
+      body: problems.map(describe).join('\n'),
+    };
+    if (channelId) notification.channelId = channelId;
+    return { notifications: [notification] };
+  }
+
   function notifyViaCapacitor(problems) {
     const cap = window.Capacitor;
     const plugin = cap && cap.Plugins && cap.Plugins.LocalNotifications;
@@ -1318,17 +1387,17 @@ window.FXShared = window.FXShared || {};
       .then(() => (plugin.requestPermissions ? plugin.requestPermissions() : { display: 'granted' }))
       .then((res) => {
         if (res && res.display && res.display !== 'granted') return null;
-        return plugin.schedule({
-          notifications: [
-            {
-              // A stable-ish id keeps a burst from stacking into a pile of
-              // near-identical notifications; Android requires a 32-bit int.
-              id: Math.floor(Date.now() / 1000) % 2147483647,
-              title: problems.length === 1 ? 'Lineup warning' : `${problems.length} lineup warnings`,
-              body: problems.map(describe).join('\n'),
-            },
-          ],
-        });
+        // Preferred path: our own silent, low-importance channel.
+        return withTimeout(
+          ensureChannel(plugin).then(() => plugin.schedule(buildNotification(problems, CHANNEL_ID))),
+          4000
+        ).catch(() =>
+          // Fallback: schedule with no channel at all, which lands on the
+          // plugin's default channel. Louder than we'd like, but GETTING
+          // the warning matters more than how quietly it arrives -- and
+          // this path is the one confirmed working on-device.
+          plugin.schedule(buildNotification(problems, null))
+        );
       })
       .catch(() => {
         /* denied or unavailable -- the in-page banner still shows */
@@ -1730,9 +1799,32 @@ window.FXP = window.FXP || {};
   // mobile one, mid-collapse) -- main.js retries setupTabs() on every
   // render anyway, so once the user opens that panel (or Fantrax's own
   // Angular otherwise reveals it), this succeeds on a later pass.
+  // Fantrax renders TWO copies of the Easy Click/Classic pill pair: one
+  // desktop-only (`hide--phablet`, i.e. hidden AT phablet width and below)
+  // and one inside the mobile filter panel's collapsible row. We must
+  // attach our own pill to whichever copy this viewport actually shows.
+  //
+  // Testing for a `hide--*` class alone is wrong in BOTH directions, and
+  // did break desktop: `hide--phablet` marks the copy that is hidden on
+  // narrow screens, which means it's the VISIBLE one on a wide screen --
+  // so a class-name test excluded exactly the copy a desktop user sees,
+  // our pill went into the collapsed mobile accordion, and the pitch
+  // editor became unreachable on desktop entirely.
+  //
+  // A plain "is it visible" test is wrong too: the mobile copy lives in a
+  // collapsed-by-default accordion, so it's `display: none` at rest even
+  // on the viewport it belongs to.
+  //
+  // So: an element is hidden for THIS viewport only if some ancestor is
+  // both marked with a responsive `hide--*` class AND actually computing
+  // to `display: none` right now. That reads Fantrax's own breakpoints
+  // straight from the live CSS instead of hardcoding them here, and
+  // ignores the accordion's own collapsed state (no `hide--*` class),
+  // which says nothing about which viewport the copy is for.
   function isHiddenForViewport(el) {
     for (let node = el; node; node = node.parentElement) {
-      if (node.classList && Array.from(node.classList).some((c) => /^hide--/.test(c))) return true;
+      if (!node.classList || !Array.from(node.classList).some((c) => /^hide--/.test(c))) continue;
+      if (getComputedStyle(node).display === 'none') return true;
     }
     return false;
   }
@@ -5774,9 +5866,18 @@ window.FXM = window.FXM || {};
   // cached rows immediately if last5.js already has them, otherwise a
   // "loading…" placeholder that refreshLast5UI (above) swaps out once the
   // fetch resolves. Mirrors buildStatsSection's own null-means-skip-me
-  // contract. No longer gated to gameState 'upcoming' -- see this
-  // section's own header comment for why.
+  // contract.
+  //
+  // Gated to players whose own game hasn't been played yet. On a
+  // HISTORICAL matchup every game is finished, and the most recent
+  // performance IS the game whose score is already on the card being
+  // tapped -- so the section just restated what the user was looking at,
+  // which read as a duplicate. Recent form answers "will they do
+  // anything?", a question that only exists before kickoff; afterwards
+  // the real number has replaced it. Same rule the roster's own menu
+  // uses (there via `locked`), so the two features behave alike.
   function buildLast5Section(p, side) {
+    if (FXM.gameState(p.gameText) !== 'upcoming') return null;
     const teamId = side === 'home' ? state.homeTeamId : state.awayTeamId;
     const container = document.createElement('div');
     container.className = 'fxm-action-menu__last5';

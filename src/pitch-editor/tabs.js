@@ -70,9 +70,32 @@
   // mobile one, mid-collapse) -- main.js retries setupTabs() on every
   // render anyway, so once the user opens that panel (or Fantrax's own
   // Angular otherwise reveals it), this succeeds on a later pass.
+  // Fantrax renders TWO copies of the Easy Click/Classic pill pair: one
+  // desktop-only (`hide--phablet`, i.e. hidden AT phablet width and below)
+  // and one inside the mobile filter panel's collapsible row. We must
+  // attach our own pill to whichever copy this viewport actually shows.
+  //
+  // Testing for a `hide--*` class alone is wrong in BOTH directions, and
+  // did break desktop: `hide--phablet` marks the copy that is hidden on
+  // narrow screens, which means it's the VISIBLE one on a wide screen --
+  // so a class-name test excluded exactly the copy a desktop user sees,
+  // our pill went into the collapsed mobile accordion, and the pitch
+  // editor became unreachable on desktop entirely.
+  //
+  // A plain "is it visible" test is wrong too: the mobile copy lives in a
+  // collapsed-by-default accordion, so it's `display: none` at rest even
+  // on the viewport it belongs to.
+  //
+  // So: an element is hidden for THIS viewport only if some ancestor is
+  // both marked with a responsive `hide--*` class AND actually computing
+  // to `display: none` right now. That reads Fantrax's own breakpoints
+  // straight from the live CSS instead of hardcoding them here, and
+  // ignores the accordion's own collapsed state (no `hide--*` class),
+  // which says nothing about which viewport the copy is for.
   function isHiddenForViewport(el) {
     for (let node = el; node; node = node.parentElement) {
-      if (node.classList && Array.from(node.classList).some((c) => /^hide--/.test(c))) return true;
+      if (!node.classList || !Array.from(node.classList).some((c) => /^hide--/.test(c))) continue;
+      if (getComputedStyle(node).display === 'none') return true;
     }
     return false;
   }
