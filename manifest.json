@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Prettier Fantrax",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Makes Fantrax prettier: a drag-and-drop pitch editor for your lineup, a head-to-head matchup pitch for live scoring, and stat tooltips that explain every number.",
   "icons": {
     "16": "icons/icon16.png",
@@ -12,7 +12,7 @@
     {
       "matches": ["https://www.fantrax.com/*"],
       "js": ["src/shared/stat-names.js", "src/content/content.js"],
-      "css": ["src/content/content.css"],
+      "css": ["src/shared/theme.css", "src/content/content.css"],
       "run_at": "document_idle"
     },
     {
@@ -20,6 +20,8 @@
       "js": [
         "src/shared/stat-names.js",
         "src/shared/touch-overlay.js",
+        "src/shared/fantrax-api.js",
+        "src/shared/last5.js",
         "src/pitch-editor/state.js",
         "src/pitch-editor/roster.js",
         "src/pitch-editor/tabs.js",
@@ -32,6 +34,7 @@
         "src/pitch-editor/main.js"
       ],
       "css": [
+        "src/shared/theme.css",
         "src/shared/touch-overlay.css",
         "src/pitch-editor/pitch.css",
         "src/pitch-editor/card.css",
@@ -45,12 +48,15 @@
       "js": [
         "src/shared/stat-names.js",
         "src/shared/touch-overlay.js",
+        "src/shared/fantrax-api.js",
+        "src/shared/last5.js",
         "src/matchup/state.js",
         "src/matchup/parse.js",
         "src/matchup/render.js",
+        "src/matchup/action-menu.js",
         "src/matchup/main.js"
       ],
-      "css": ["src/shared/touch-overlay.css", "src/matchup/matchup.css"],
+      "css": ["src/shared/theme.css", "src/shared/touch-overlay.css", "src/matchup/matchup.css", "src/matchup/action-menu.css"],
       "run_at": "document_idle"
     }
   ]

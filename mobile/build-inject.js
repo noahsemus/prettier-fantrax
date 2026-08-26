@@ -76,8 +76,16 @@ function buildBundle() {
 
   const parts = [];
 
-  // a) diagnostics flag, read by mobile/diagnostics.js below
-  parts.push('window.FX_DIAGNOSTICS = true;\n');
+  // a) diagnostics flag, read by mobile/diagnostics.js below. OFF by
+  //    default: the badge existed because a phone had no console to check
+  //    when the selectors drifted, but the app is debuggable over USB now
+  //    (chrome://inspect, or CDP against webview_devtools_remote_<pid>),
+  //    which is strictly better -- and the badge sits over the site's own
+  //    bottom nav, reading as a stray debug popup to anyone just using the
+  //    app. Flip to `true` here (or set window.FX_DIAGNOSTICS from a
+  //    console) to bring it back for a selector-drift hunt.
+  const DIAGNOSTICS_ENABLED = false;
+  parts.push(`window.FX_DIAGNOSTICS = ${DIAGNOSTICS_ENABLED};\n`);
 
   // b) guarded CSS injection
   parts.push(buildCssInjectionScript(css));

@@ -13,8 +13,17 @@ points it earned -- everywhere, in one hover.
 Everything is built as a layer over the real site: what it shows is
 read from the page Fantrax already renders, and what it *does* (swaps,
 trades, drops) works by driving Fantrax's own real buttons. There's no
-API access, no login handling, and nothing is ever sent anywhere --
-it's a pure content script that runs only on `fantrax.com`.
+login handling, nothing is ever sent to any third party, and it runs
+only on `fantrax.com`.
+
+Two features are the exception to "read from the page," because the
+data they need simply isn't in the page's markup: **recent
+performances** (a player's last few gameweek scores) and the **manager
+username** under each matchup team name. Those read from Fantrax's own
+internal endpoint -- the same request the Fantrax web app itself makes
+when you open a player card or a team's roster -- using the session
+you're already logged into. It's same-origin: nothing leaves
+fantrax.com, and no credentials are handled or stored.
 
 ## How to install
 
@@ -39,7 +48,8 @@ Works in Chrome and Chrome-based browsers (Edge, Brave, Arc, ...).
    automatically on any `https://www.fantrax.com/*` page.
 
 No permissions beyond running on fantrax.com are requested, and nothing
-is sent off the page -- it's a pure content script.
+is sent to any third party (see the note above about the two features
+that read from Fantrax's own endpoint).
 
 To update later: download the new release ZIP, replace the folder's
 contents, and click the refresh icon on the extension's card in
@@ -203,6 +213,11 @@ attempt is also verified afterward by re-reading the list, so a swap
 that doesn't take reports itself plainly instead of pretending it
 worked.
 
+Tapping a player on a touch screen opens an action menu with their
+projection, their **recent performances** (last few gameweek scores
+with opponents, for players whose game hasn't kicked off yet), and the
+real actions above.
+
 ### Head-to-head matchup pitch (Live Scoring page)
 
 ![The head-to-head matchup pitch on the Live Scoring page](screenshots/matchup-pitch.png)
@@ -214,10 +229,19 @@ plus a compact bench strip per team, with every player's card showing
 their live fantasy points. A **"Show pitch" / "Hide pitch"** button
 collapses it whenever you'd rather have the plain tables.
 
-- **Hover (or tap, on touch screens) any player** for their stat
-  breakdown -- the same hybrid lines as the tooltips below, e.g.
-  "1 Assists (Total) (+6)", so you can see both what they did and what
-  it was worth. A tapped selection survives live-score re-renders.
+- **Hover any player** (desktop) for their stat breakdown -- the same
+  hybrid lines as the tooltips below, e.g. "1 Assists (Total) (+6)", so
+  you can see both what they did and what it was worth.
+- **Tap any player** (touch) to open an action menu with that
+  breakdown, their **recent performances**, and real actions: **View
+  Player Card** and **Trade...**, both of which drive Fantrax's own UI.
+  The menu stays anchored to its player through live-score re-renders,
+  and every other player dims while it's open.
+- **Recent performances** lists a player's last few gameweek scores
+  with the opponent, e.g. "@ HUL (+12)" / "vs TOT (+23.5)" -- recent
+  form, right where you're deciding whether to worry about them.
+- **The manager's username** shows under each team name, so you know
+  who you're actually playing.
 - **Each player's fixture** shows under their points (same treatment
   as the roster pitch), and long text -- fixtures, names, team names
   -- marquees back and forth instead of truncating.
@@ -229,6 +253,13 @@ collapses it whenever you'd rather have the plain tables.
 - **Live.** It re-renders itself whenever the page's live scores
   refresh, the gameweek changes, or you flip the matchup carousel to a
   different head-to-head.
+
+### Follows Fantrax's own light/dark theme
+
+Everything this adds reads its colors from whichever theme the site is
+in, switching live when you switch -- no reload. The pitch stays green
+in both, since that's the point of it; the panels, menus and tooltips
+around it follow the site.
 
 ### Stat tooltips that actually explain the number
 
@@ -269,15 +300,23 @@ src/
                          anchoring a tap-opened overlay to a card, keeping it
                          stuck through scrolls, dimming other cards, telling
                          a real tap from the tail end of a scroll
+    theme.css            light/dark color tokens, keyed off Fantrax's own
+                         `theme--dark` body class (light = no class)
+    fantrax-api.js       same-origin POST helper for Fantrax's own /fxpa/req
+                         endpoint -- see the note at the top of this README
+    last5.js             "recent performances" lookup + session cache, shared
+                         by both pitches (one league-wide player lookup total)
   content/               Live Scoring: hybrid stat tooltips + Fpts default
     content.js
     content.css
   matchup/               Live Scoring: head-to-head matchup pitch
     state.js               shared `window.FXM` namespace + state + DOM utils
     parse.js               reads Fantrax's two scoring tables + headers into { home, away }
-    render.js              builds the two-team pitch, bench strips, tooltip
+    render.js              builds the two-team pitch, bench strips, tooltip, team headers
+    action-menu.js         per-player menu (stats, recent performances, View Card, Trade)
     main.js                boot + MutationObserver to stay in sync with live updates
     matchup.css            all styling incl. the wide/narrow orientation flip
+    action-menu.css        the menu's own styling
   pitch-editor/          Team Roster: drag-and-drop pitch editor
     state.js               shared `window.FXP` namespace + state + tiny DOM utils
     roster.js              parses Fantrax's real `.i-table__row` list into player objects
@@ -287,7 +326,8 @@ src/
     tooltip.js             hover tooltip (points breakdown / projection)
     points-sync.js         background scrape of Fantrax's Fantasy Points + Projected views
     swap.js                drives Fantrax's real lineup buttons to perform a swap
-    action-menu.js         per-player click menu (Start Swap / Trade / Drop / View Player Card)
+    action-menu.js         per-player menu (Start Swap / Trade / Drop / View Player Card,
+                           plus stats + recent performances on touch)
     main.js                boot + MutationObserver to stay in sync with live updates
     *.css                  one stylesheet per concern (pitch shell, cards, tooltip, menu)
 mobile/                  Capacitor app wrapping fantrax.com for iOS/Android
@@ -296,8 +336,9 @@ mobile/                  Capacitor app wrapping fantrax.com for iOS/Android
 Since these are plain (non-module) scripts sharing one global scope,
 each feature's files avoid relying on that implicitly and instead
 read/write an explicit namespace object -- `window.FXP` for the pitch
-editor, `window.FXM` for the matchup pitch, `window.FXShared` for the
-shared touch-overlay helpers. In each feature, `state.js` creates the
+editor, `window.FXM` for the matchup pitch, `window.FXShared` for
+everything in `src/shared/` (touch-overlay helpers, the Fantrax fetch
+helper, and the recent-performances lookup both pitches share). In each feature, `state.js` creates the
 namespace and must load first; `main.js`, which calls `start()`, must
 load last -- everything in between can reference any namespaced
 function regardless of file order, since those references only get
