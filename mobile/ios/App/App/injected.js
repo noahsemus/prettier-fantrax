@@ -1747,6 +1747,11 @@ window.FXP = window.FXP || {};
     // paints into nothing instead of the wrong player's menu. Cleared by
     // closeActionMenu alongside actionMenuEl. See action-menu.js.
     actionMenuPlayerKey: null,
+    // A points-sync commit landed while the action menu was open, so the
+    // full re-render was deferred to keep the menu alive (points-sync.js
+    // refreshes the menu's sections in place instead). closeActionMenu
+    // performs the deferred render.
+    renderPendingAfterMenu: false,
 
     // hover: how a player got their points (or their season average, if unplayed)
     breakdownCache: new Map(), // name -> { lines: [{abbr, label, text}] }
@@ -3252,7 +3257,13 @@ window.FXP = window.FXP || {};
     if (p.isEmpty) return null;
     if (p.locked) {
       const entry = state.breakdownCache.get(p.name);
-      if (!entry) return ['Loading points breakdown…'];
+      if (!entry) {
+        // Hovering is an explicit ask for this player's numbers -- kick
+        // the sync now rather than waiting for a retry timer; the commit
+        // path's refreshOpenTooltip repaints this tooltip in place.
+        if (FXP.requestPointsSync) FXP.requestPointsSync();
+        return ['Loading points breakdown…'];
+      }
       // Same gameweek-scoped points figure the card shows (see render.js's
       // locked branch) -- p.fptsText follows the user's period dropdown
       // (default YTD = season totals), so it can't headline a
@@ -3301,6 +3312,7 @@ window.FXP = window.FXP || {};
     // longer shown anywhere (user request 2026-08-28).
     const avg = state.averageCache.get(p.name);
     if (avg === undefined || avg === null || avg === '-') {
+      if (avg === undefined && FXP.requestPointsSync) FXP.requestPointsSync(); // same explicit-demand kick as the breakdown branch
       return [...statusLine, 'Season average not synced yet'];
     }
     return [...statusLine, `Season average: ${avg} pts/game`];
@@ -3845,10 +3857,41 @@ window.FXP = window.FXP || {};
       // failed run) or its gwKey-already-cached check (on a committed run,
       // pointsCacheGwKey now equals gwKey) stop it from re-triggering a
       // sync synchronously in a loop.
-      if (state.tabActive) FXP.render();
+      if (state.tabActive) {
+        if (state.actionMenuEl && FXP.refreshActionMenuSections) {
+          // A full render() tears down every card AND the open action
+          // menu -- so a sync that lands while the user is looking at a
+          // tapped player's "Loading points breakdown…" would CLOSE the
+          // menu instead of filling it (they'd have to re-tap). Refresh
+          // the open menu's read-only sections in place instead, and
+          // defer the full card re-render until the menu closes (see
+          // closeActionMenu in action-menu.js).
+          state.renderPendingAfterMenu = true;
+          FXP.refreshActionMenuSections();
+        } else {
+          FXP.render();
+        }
+      }
     }
   }
 
+  // Explicit-demand sync: the user just did something that NEEDS the
+  // caches RIGHT NOW -- tapped a player whose breakdown isn't loaded,
+  // hovered a card before the first sync landed. An explicit gesture
+  // beats every implicit signal (timers, backoffs, mutation-driven
+  // renders), so this skips the retry backoff entirely and runs
+  // immediately. syncPointsData's own guards (in-flight, busy, pending
+  // lineup changes, page layout) still apply, so a tap-storm can't
+  // stampede the page -- at most one sync runs, and repeat calls while
+  // it's in flight are no-ops. (User suggestion 2026-08-28: "why wait
+  // for an implicit signal when we have something explicit?")
+  function requestPointsSync() {
+    if (state.pointsSyncInFlight || state.busy) return;
+    state.pointsLastAttemptAt = 0;
+    maybeSyncPointsData();
+  }
+
+  FXP.requestPointsSync = requestPointsSync;
   FXP.hasPendingLineupChanges = hasPendingLineupChanges;
   FXP.findStatsTabs = findStatsTabs;
   FXP.isTabSelected = isTabSelected;
@@ -4487,6 +4530,23 @@ window.FXP = window.FXP || {};
     return container;
   }
 
+  // Rebuilds the open menu's read-only stats section in place from the
+  // (just-committed) caches -- points-sync.js calls this instead of a
+  // full render whenever a sync lands while the menu is open. The last5
+  // section has its own async refresh (refreshLast5UI) and the action
+  // buttons never change, so the stats block is the only piece that
+  // needs re-deriving.
+  function refreshActionMenuSections() {
+    if (!state.actionMenuEl || !state.actionMenuPlayerKey) return;
+    const p = FXP.parseRoster().find((x) => x.key === state.actionMenuPlayerKey);
+    if (!p) return;
+    const oldStats = state.actionMenuEl.querySelector('.fx-action-menu__stats');
+    if (!oldStats) return; // fine-pointer menu (no stats section) -- the hover tooltip covers it
+    const fresh = buildStatsSection(p);
+    if (fresh) oldStats.replaceWith(fresh);
+  }
+  FXP.refreshActionMenuSections = refreshActionMenuSections;
+
   function onDocClick(e) {
     if (state.actionMenuEl && !state.actionMenuEl.contains(e.target)) closeActionMenu();
   }
@@ -4511,6 +4571,18 @@ window.FXP = window.FXP || {};
     FXShared.clearDim(state.container || document, '.fx-card', 'fx-card--dimmed');
     document.removeEventListener('click', onDocClick, true);
     document.removeEventListener('keydown', onKeydown, true);
+    // A sync committed while this menu was open and its full re-render was
+    // deferred to keep the menu alive (see points-sync.js's finally
+    // block). Run it now that the menu is gone -- via rAF, and only if no
+    // NEW menu has opened by then, so an immediate re-tap isn't yanked
+    // away by the catch-up render (its sections build from the fresh
+    // caches anyway).
+    if (state.renderPendingAfterMenu) {
+      state.renderPendingAfterMenu = false;
+      requestAnimationFrame(() => {
+        if (!state.actionMenuEl && state.tabActive) FXP.render();
+      });
+    }
   }
 
   // Desktop (fine-pointer) positioning only -- raw tap/click coordinates,
@@ -4537,6 +4609,15 @@ window.FXP = window.FXP || {};
     // Tracked so refreshLast5UI can tell whether the menu that's open when
     // a fetch resolves is still the one that started it.
     state.actionMenuPlayerKey = p.key;
+
+    // The user's tap is an EXPLICIT demand for this player's numbers --
+    // if the breakdown isn't cached yet (the menu would show "Loading
+    // points breakdown…"), kick the sync immediately rather than waiting
+    // for a retry timer. When it commits, refreshActionMenuSections
+    // (called from points-sync's finally) fills this menu in place.
+    if (!state.breakdownCache.has(p.name) && FXP.requestPointsSync) {
+      FXP.requestPointsSync();
+    }
 
     if (coarse) {
       const statsSection = buildStatsSection(p);

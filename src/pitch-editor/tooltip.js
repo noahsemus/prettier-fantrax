@@ -166,7 +166,13 @@
     if (p.isEmpty) return null;
     if (p.locked) {
       const entry = state.breakdownCache.get(p.name);
-      if (!entry) return ['Loading points breakdown…'];
+      if (!entry) {
+        // Hovering is an explicit ask for this player's numbers -- kick
+        // the sync now rather than waiting for a retry timer; the commit
+        // path's refreshOpenTooltip repaints this tooltip in place.
+        if (FXP.requestPointsSync) FXP.requestPointsSync();
+        return ['Loading points breakdown…'];
+      }
       // Same gameweek-scoped points figure the card shows (see render.js's
       // locked branch) -- p.fptsText follows the user's period dropdown
       // (default YTD = season totals), so it can't headline a
@@ -215,6 +221,7 @@
     // longer shown anywhere (user request 2026-08-28).
     const avg = state.averageCache.get(p.name);
     if (avg === undefined || avg === null || avg === '-') {
+      if (avg === undefined && FXP.requestPointsSync) FXP.requestPointsSync(); // same explicit-demand kick as the breakdown branch
       return [...statusLine, 'Season average not synced yet'];
     }
     return [...statusLine, `Season average: ${avg} pts/game`];

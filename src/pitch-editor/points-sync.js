@@ -528,10 +528,41 @@
       // failed run) or its gwKey-already-cached check (on a committed run,
       // pointsCacheGwKey now equals gwKey) stop it from re-triggering a
       // sync synchronously in a loop.
-      if (state.tabActive) FXP.render();
+      if (state.tabActive) {
+        if (state.actionMenuEl && FXP.refreshActionMenuSections) {
+          // A full render() tears down every card AND the open action
+          // menu -- so a sync that lands while the user is looking at a
+          // tapped player's "Loading points breakdown…" would CLOSE the
+          // menu instead of filling it (they'd have to re-tap). Refresh
+          // the open menu's read-only sections in place instead, and
+          // defer the full card re-render until the menu closes (see
+          // closeActionMenu in action-menu.js).
+          state.renderPendingAfterMenu = true;
+          FXP.refreshActionMenuSections();
+        } else {
+          FXP.render();
+        }
+      }
     }
   }
 
+  // Explicit-demand sync: the user just did something that NEEDS the
+  // caches RIGHT NOW -- tapped a player whose breakdown isn't loaded,
+  // hovered a card before the first sync landed. An explicit gesture
+  // beats every implicit signal (timers, backoffs, mutation-driven
+  // renders), so this skips the retry backoff entirely and runs
+  // immediately. syncPointsData's own guards (in-flight, busy, pending
+  // lineup changes, page layout) still apply, so a tap-storm can't
+  // stampede the page -- at most one sync runs, and repeat calls while
+  // it's in flight are no-ops. (User suggestion 2026-08-28: "why wait
+  // for an implicit signal when we have something explicit?")
+  function requestPointsSync() {
+    if (state.pointsSyncInFlight || state.busy) return;
+    state.pointsLastAttemptAt = 0;
+    maybeSyncPointsData();
+  }
+
+  FXP.requestPointsSync = requestPointsSync;
   FXP.hasPendingLineupChanges = hasPendingLineupChanges;
   FXP.findStatsTabs = findStatsTabs;
   FXP.isTabSelected = isTabSelected;

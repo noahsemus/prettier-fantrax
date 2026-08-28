@@ -204,6 +204,23 @@
     return container;
   }
 
+  // Rebuilds the open menu's read-only stats section in place from the
+  // (just-committed) caches -- points-sync.js calls this instead of a
+  // full render whenever a sync lands while the menu is open. The last5
+  // section has its own async refresh (refreshLast5UI) and the action
+  // buttons never change, so the stats block is the only piece that
+  // needs re-deriving.
+  function refreshActionMenuSections() {
+    if (!state.actionMenuEl || !state.actionMenuPlayerKey) return;
+    const p = FXP.parseRoster().find((x) => x.key === state.actionMenuPlayerKey);
+    if (!p) return;
+    const oldStats = state.actionMenuEl.querySelector('.fx-action-menu__stats');
+    if (!oldStats) return; // fine-pointer menu (no stats section) -- the hover tooltip covers it
+    const fresh = buildStatsSection(p);
+    if (fresh) oldStats.replaceWith(fresh);
+  }
+  FXP.refreshActionMenuSections = refreshActionMenuSections;
+
   function onDocClick(e) {
     if (state.actionMenuEl && !state.actionMenuEl.contains(e.target)) closeActionMenu();
   }
@@ -228,6 +245,18 @@
     FXShared.clearDim(state.container || document, '.fx-card', 'fx-card--dimmed');
     document.removeEventListener('click', onDocClick, true);
     document.removeEventListener('keydown', onKeydown, true);
+    // A sync committed while this menu was open and its full re-render was
+    // deferred to keep the menu alive (see points-sync.js's finally
+    // block). Run it now that the menu is gone -- via rAF, and only if no
+    // NEW menu has opened by then, so an immediate re-tap isn't yanked
+    // away by the catch-up render (its sections build from the fresh
+    // caches anyway).
+    if (state.renderPendingAfterMenu) {
+      state.renderPendingAfterMenu = false;
+      requestAnimationFrame(() => {
+        if (!state.actionMenuEl && state.tabActive) FXP.render();
+      });
+    }
   }
 
   // Desktop (fine-pointer) positioning only -- raw tap/click coordinates,
@@ -254,6 +283,15 @@
     // Tracked so refreshLast5UI can tell whether the menu that's open when
     // a fetch resolves is still the one that started it.
     state.actionMenuPlayerKey = p.key;
+
+    // The user's tap is an EXPLICIT demand for this player's numbers --
+    // if the breakdown isn't cached yet (the menu would show "Loading
+    // points breakdown…"), kick the sync immediately rather than waiting
+    // for a retry timer. When it commits, refreshActionMenuSections
+    // (called from points-sync's finally) fills this menu in place.
+    if (!state.breakdownCache.has(p.name) && FXP.requestPointsSync) {
+      FXP.requestPointsSync();
+    }
 
     if (coarse) {
       const statsSection = buildStatsSection(p);

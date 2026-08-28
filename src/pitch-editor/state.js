@@ -42,6 +42,11 @@ window.FXP = window.FXP || {};
     // paints into nothing instead of the wrong player's menu. Cleared by
     // closeActionMenu alongside actionMenuEl. See action-menu.js.
     actionMenuPlayerKey: null,
+    // A points-sync commit landed while the action menu was open, so the
+    // full re-render was deferred to keep the menu alive (points-sync.js
+    // refreshes the menu's sections in place instead). closeActionMenu
+    // performs the deferred render.
+    renderPendingAfterMenu: false,
 
     // hover: how a player got their points (or their season average, if unplayed)
     breakdownCache: new Map(), // name -> { lines: [{abbr, label, text}] }
