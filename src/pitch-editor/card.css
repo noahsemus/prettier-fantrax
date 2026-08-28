@@ -343,7 +343,7 @@ body:not(.theme--dark) .fx-bench .fx-card__fpts--zero {
   color: var(--fx-pts-zero);
 }
 
-/* ---------- narrow viewports: shrink on-pitch cards, never wrap ----------
+/* ---------- narrow viewports: shrink cards, never wrap the field ----------
    A full 5-wide position row of fixed 88px cards can't fit a phone
    viewport, and .fx-pitch__row is deliberately nowrap now (see
    pitch.css: wrapping turned formations into a nonsense 2-2-2-2-2 look).
@@ -351,10 +351,13 @@ body:not(.theme--dark) .fx-bench .fx-card__fpts--zero {
    narrow block value-for-value (58px cards, 32px crest, 9px name; with
    pitch.css's 6px narrow gap, 5 * 58 + 4 * 6 = 314px fits comfortably)
    and using the SAME 760px breakpoint so the two pitches shrink in step.
-   Scoped to .fx-pitch__row so bench cards keep their regular size, the
-   same way matchup scopes with :not(--bench). */
+   Bench cards shrink along with the on-field ones (per user request:
+   bench and field players should be the same size on this pitch), so
+   the two card sizes never diverge at any width here -- unlike matchup,
+   whose bench is deliberately its own compact size. */
 @media (max-width: 760px) {
-  .fx-pitch__row .fx-card {
+  .fx-pitch__row .fx-card,
+  .fx-bench__row .fx-card {
     width: 58px;
     /* Don't shrink below the fixed width -- flex items compress before a
        container overflows, which would squash the cards instead of letting
@@ -362,21 +365,25 @@ body:not(.theme--dark) .fx-bench .fx-card__fpts--zero {
     flex-shrink: 0;
   }
 
-  .fx-pitch__row .fx-card__crest {
+  .fx-pitch__row .fx-card__crest,
+  .fx-bench__row .fx-card__crest {
     height: 32px;
     max-width: 36px;
   }
 
-  .fx-pitch__row .fx-card__name {
+  .fx-pitch__row .fx-card__name,
+  .fx-bench__row .fx-card__name {
     font-size: 9px;
     max-width: 54px;
   }
 
-  .fx-pitch__row .fx-card__fpts {
+  .fx-pitch__row .fx-card__fpts,
+  .fx-bench__row .fx-card__fpts {
     font-size: 10px;
   }
 
-  .fx-pitch__row .fx-card__opp {
+  .fx-pitch__row .fx-card__opp,
+  .fx-bench__row .fx-card__opp {
     max-width: 54px;
   }
 }
