@@ -252,9 +252,23 @@
       type,
       (e) => {
         if (e.touches && e.touches.length > 0) return; // fingers still down
-        if (touchActive) endTouchDrag();
-        touchInProgress = false;
-        clearTouchTimer();
+        // DEFERRED past this event's full dispatch -- this is a CAPTURE
+        // listener, so it fires BEFORE the card's own touchend handler,
+        // and running endTouchDrag() synchronously here cleared
+        // touchActive before finishTouchDrag() could see it: every
+        // drag-to-swap DROP silently became a no-op (v0.2.9 regression,
+        // reported on iOS -- "starts the drag but when I drop nothing
+        // happens"; tap-to-swap still worked because it never sets
+        // touchActive). With the 0ms timeout, a still-attached card's own
+        // handler runs first and completes the swap (clearing touchActive
+        // itself), leaving this as what it was always meant to be:
+        // cleanup for gestures whose card was destroyed mid-touch and
+        // whose own handlers therefore never fired.
+        setTimeout(() => {
+          if (touchActive) endTouchDrag();
+          touchInProgress = false;
+          clearTouchTimer();
+        }, 0);
       },
       { passive: true, capture: true }
     );

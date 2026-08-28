@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Prettier Fantrax
 // @description  Makes Fantrax prettier: a drag-and-drop pitch editor for your lineup, a head-to-head matchup pitch for live scoring, and stat tooltips that explain every number.
-// @version      0.2.10
+// @version      0.2.11
 // @author       Noah Semus
 // @homepageURL  https://github.com/noahsemus/prettier-fantrax
 // @icon         https://raw.githubusercontent.com/noahsemus/prettier-fantrax/main/icons/icon48.png
@@ -2945,9 +2945,23 @@ window.FXP = window.FXP || {};
       type,
       (e) => {
         if (e.touches && e.touches.length > 0) return; // fingers still down
-        if (touchActive) endTouchDrag();
-        touchInProgress = false;
-        clearTouchTimer();
+        // DEFERRED past this event's full dispatch -- this is a CAPTURE
+        // listener, so it fires BEFORE the card's own touchend handler,
+        // and running endTouchDrag() synchronously here cleared
+        // touchActive before finishTouchDrag() could see it: every
+        // drag-to-swap DROP silently became a no-op (v0.2.9 regression,
+        // reported on iOS -- "starts the drag but when I drop nothing
+        // happens"; tap-to-swap still worked because it never sets
+        // touchActive). With the 0ms timeout, a still-attached card's own
+        // handler runs first and completes the swap (clearing touchActive
+        // itself), leaving this as what it was always meant to be:
+        // cleanup for gestures whose card was destroyed mid-touch and
+        // whose own handlers therefore never fired.
+        setTimeout(() => {
+          if (touchActive) endTouchDrag();
+          touchInProgress = false;
+          clearTouchTimer();
+        }, 0);
       },
       { passive: true, capture: true }
     );
