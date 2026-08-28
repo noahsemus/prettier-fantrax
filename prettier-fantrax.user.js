@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Prettier Fantrax
 // @description  Makes Fantrax prettier: a drag-and-drop pitch editor for your lineup, a head-to-head matchup pitch for live scoring, and stat tooltips that explain every number.
-// @version      0.2.6
+// @version      0.2.7
 // @author       Noah Semus
 // @homepageURL  https://github.com/noahsemus/prettier-fantrax
 // @icon         https://raw.githubusercontent.com/noahsemus/prettier-fantrax/main/icons/icon48.png
