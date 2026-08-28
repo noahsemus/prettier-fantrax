@@ -151,16 +151,36 @@
     return null;
   }
 
-  const VALID_POS_LABELS = { G: true, D: true, M: true, F: true, Res: true };
-
   function parseRow(row) {
     const cells = qa(':scope > .scoring-table__cell', row);
     if (cells.length !== 3) return null; // section header ("GOALKEEPER"/"OUTFIELDER") or spacer row
     const midCell = cells[1];
     const posLabel = midCell ? midCell.textContent.trim() : '';
-    if (!VALID_POS_LABELS[posLabel]) return null; // the "Total" footer row, or anything unexpected
     return { posLabel, left: parseSide(cells[0]), right: parseSide(cells[2]) };
   }
+
+  // Which starters bucket a side belongs in. The center gutter's label is
+  // used when it's a plain G/D/M/F -- but it is NOT required to be:
+  // parseRow used to reject any row whose gutter label wasn't exactly
+  // G/D/M/F/Res, and a real Android user's league (reported 2026-08-28)
+  // rendered gutter labels that matched none of those, so their ENTIRE
+  // starting lineup was dropped -- team headers and bench strips rendered
+  // (parseHeaders and the reserves table were fine) around a completely
+  // empty field, which is exactly the reported symptom. Starters vs
+  // reserves doesn't actually need the label at all (the page's two
+  // .scoring-table elements already split them -- see parseMatchup), so an
+  // unrecognized label now falls back to the PLAYER'S OWN first listed
+  // position (parseSide's posSpans read, e.g. "D" from a "D,M" player)
+  // instead of throwing the row away. Footer rows ("Total") still drop
+  // out naturally: they have no player-name link, so parseSide returns
+  // null for both sides.
+  function starterBucket(posLabel, side) {
+    if (POS_BUCKETS[posLabel]) return posLabel;
+    const own = side && side.pos ? side.pos.trim().charAt(0).toUpperCase() : '';
+    return POS_BUCKETS[own] ? own : null;
+  }
+
+  const POS_BUCKETS = { G: true, D: true, M: true, F: true };
 
   function emptyPosBuckets() {
     return { G: [], D: [], M: [], F: [] };
@@ -179,19 +199,47 @@
     const home = { header: headers[0], starters: emptyPosBuckets(), reserves: [] };
     const away = { header: headers[1], starters: emptyPosBuckets(), reserves: [] };
 
+    // Starters vs reserves comes from WHICH TABLE a row lives in
+    // ([0] = starters, [1] = reserves -- see parseMatchup's own header
+    // comment), not from the gutter label; see starterBucket above for
+    // why the label is only a hint. The 'Res' guard on the starters table
+    // stays as belt-and-suspenders against a layout that ever mixes them.
     qa('.scoring-table__row', tables[0]).forEach((row) => {
       const parsed = parseRow(row);
       if (!parsed || parsed.posLabel === 'Res') return;
-      if (parsed.left) home.starters[parsed.posLabel].push(parsed.left);
-      if (parsed.right) away.starters[parsed.posLabel].push(parsed.right);
+      const leftBucket = starterBucket(parsed.posLabel, parsed.left);
+      const rightBucket = starterBucket(parsed.posLabel, parsed.right);
+      if (parsed.left && leftBucket) home.starters[leftBucket].push(parsed.left);
+      if (parsed.right && rightBucket) away.starters[rightBucket].push(parsed.right);
     });
 
     qa('.scoring-table__row', tables[1]).forEach((row) => {
       const parsed = parseRow(row);
-      if (!parsed || parsed.posLabel !== 'Res') return;
+      if (!parsed) return;
       if (parsed.left) home.reserves.push(parsed.left);
       if (parsed.right) away.reserves.push(parsed.right);
     });
+
+    // Diagnostic for the next unrecognized-layout report: if the starters
+    // table visibly has players but nothing landed in any bucket, log the
+    // actual gutter labels once so a user's console screenshot tells us
+    // exactly what their league renders (this is what the 2026-08-28
+    // Android report was missing).
+    const starterCount = FXM.POS_ORDER.reduce(
+      (n, pos) => n + home.starters[pos].length + away.starters[pos].length,
+      0
+    );
+    if (starterCount === 0) {
+      const labels = Array.from(
+        new Set(
+          qa('.scoring-table__row', tables[0]).map((row) => {
+            const cells = qa(':scope > .scoring-table__cell', row);
+            return cells.length === 3 && cells[1] ? cells[1].textContent.trim() : '';
+          })
+        )
+      ).filter(Boolean);
+      if (labels.length) console.warn('[fx-matchup] no starters parsed; gutter labels were:', labels);
+    }
 
     return { home, away };
   }

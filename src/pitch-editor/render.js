@@ -326,16 +326,13 @@
           const inner = el.querySelector(innerSelector);
           if (!inner) return;
           // Measure the box's full content overflow (el.scrollWidth), not
-          // the inner span's own width: the event-status dot sits OUTSIDE
-          // the inner span (see renderCard), so measuring the span alone
-          // left a window where the text alone fit but dot+text overflowed
-          // -- no marquee, and text-overflow's ellipsis hides a partially
-          // fitting atomic inline (the inline-block span) entirely,
-          // collapsing the whole name to a bare "..." (constant on
-          // Android, where Roboto runs wider than desktop fonts). Same
-          // container-based measure matchup's applyMarqueeToSet uses. The
-          // travel distance is identical either way: the span's right edge
-          // must reach the box's right edge.
+          // the inner span's own width -- the container-based measure
+          // matchup's applyMarqueeToSet uses. (Historically this also
+          // mattered because the event-status dot sat inline in the name
+          // box outside the inner span; the dot is a corner badge on the
+          // card now, but the container measure remains the correct one:
+          // the travel distance is the span's right edge reaching the
+          // box's right edge either way.)
           const dist = el.scrollWidth - el.clientWidth;
           if (dist > 0) {
             const card = el.closest('.fx-card');
@@ -432,15 +429,20 @@
         dotTitle = onPitch ? 'Playing now' : 'On the bench';
       }
       if (dotStatus) {
+        // Corner badge at the info plate's bottom-left -- matchup's dot
+        // placement (.fxm-card__dot), adopted here per user request so the
+        // two pitches place dots identically. Appended to the INFO plate
+        // (its own position: relative anchor -- see card.css) rather than
+        // the card: this card has grass padding around the plate, so a
+        // card-anchored badge floated on the grass. The has-dot class
+        // lets card.css reserve room on the opp line, which shares the
+        // corner -- see matchup.css's own .fxm-card--has-dot comment.
+        card.classList.add('fx-card--has-dot');
         const dot = document.createElement('span');
         dot.className = `fx-card__dot fx-card__dot--${dotStatus}`;
         dot.title = dotTitle;
-        name.appendChild(dot);
+        info.appendChild(dot);
       }
-      // The dot (real-life event-status indicator) stays put outside the
-      // scrolling span -- only the name text itself marquees. See the
-      // measure/apply pass at the end of render() for how
-      // `fx-card__name--marquee` and `--fx-marquee-dist` get set on `name`.
       const nameInner = document.createElement('span');
       nameInner.className = 'fx-card__name-inner';
       nameInner.appendChild(document.createTextNode(p.name));

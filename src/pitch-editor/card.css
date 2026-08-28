@@ -118,6 +118,11 @@
   align-self: stretch;
   background: rgba(0, 0, 0, 0.45);
   border-radius: 6px;
+  /* Anchor for .fx-card__dot (bottom-left corner badge) -- the dot lives
+     INSIDE this plate (unlike matchup, whose plate reaches its card's
+     edges so the card itself can anchor): anchoring to the card here put
+     the dot on the grass below/left of the plate. */
+  position: relative;
   padding: 2px 5px 3px;
   /* Centers all children (name/fpts/opp, and anything added later) in one
      place rather than relying on each child to carry its own text-align. */
@@ -150,9 +155,7 @@
    render.js measures every card after each render and only adds
    .fx-card__name--marquee (plus --fx-marquee-dist, how far left the inner
    span needs to travel) to names that actually overflow -- names that fit
-   are left completely alone. The event-status dot lives outside
-   `.fx-card__name-inner` (see renderCard in render.js) so it stays fixed
-   in place while only the name text scrolls. */
+   are left completely alone. */
 .fx-card__name-inner {
   display: inline-block;
   will-change: transform;
@@ -178,14 +181,31 @@
 
 /* Fantrax's own real-life "is this player playing" indicator, reused here.
    See EVENT_STATUS_MAP in roster.js for what each color means. */
+/* Status dot as a corner badge pinned to the info plate's bottom-left --
+   matchup's .fxm-card__dot system (same size/ring), adopted per user
+   request so the two pitches place dots identically. Anchored to
+   .fx-card__info (position: relative above), NOT the card: this card has
+   grass padding around the plate, so a card-anchored badge floated on
+   the grass outside it. Used to sit inline in the name row instead. */
 .fx-card__dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  margin-right: 3px;
-  margin-bottom: 1px;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+  z-index: 2;
   pointer-events: auto;
+}
+
+/* Reserve room for the dot on the opp line, which starts from the same
+   bottom-left corner -- mirrors matchup.css's .fxm-card--has-dot rule
+   (see its comment for the full why). Added by render.js only when a dot
+   actually renders, so dot-less cards keep the full width. */
+.fx-card--has-dot .fx-card__opp {
+  margin-left: 10px;
 }
 
 .fx-card__dot--starting {
