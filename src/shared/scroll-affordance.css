@@ -1,0 +1,50 @@
+/* Prettier Fantrax -- shared: horizontal-scroll affordance arrows.
+   Companion to scroll-affordance.js, which toggles the direction classes.
+   The arrows are the scroll container's own ::before/::after: position:
+   sticky pins them to the visible left/right edge while the content pans
+   under them, and the negative margins cancel their width plus one flex
+   gap so they occupy ZERO net layout space -- rows measure and center
+   exactly as if the arrows didn't exist. pointer-events: none: they're
+   indicators, not buttons (the pan itself is native touch/trackpad
+   scrolling). Sized/colored for the green pitch both pitches share, so
+   one look works in light and dark themes alike. */
+
+.fxs-hscroll::before,
+.fxs-hscroll::after {
+  position: sticky;
+  align-self: center;
+  flex: 0 0 auto;
+  z-index: 3;
+  width: 16px;
+  height: 16px;
+  line-height: 15px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.fxs-hscroll::before {
+  content: "\2039"; /* single left angle quote, reads as a left arrow */
+  left: 2px;
+  margin-right: -22px; /* 16px own width + 6px narrow-breakpoint gap */
+}
+
+.fxs-hscroll::after {
+  content: "\203A";
+  right: 2px;
+  margin-left: -22px;
+}
+
+.fxs-hscroll--left::before {
+  opacity: 1;
+}
+
+.fxs-hscroll--right::after {
+  opacity: 1;
+}

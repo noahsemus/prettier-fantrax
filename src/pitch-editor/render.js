@@ -238,6 +238,10 @@
       row.className = 'fx-pitch__row';
       rowPlayers.forEach((p) => row.appendChild(renderCard(p, jerseyMap)));
       field.appendChild(row);
+      // Rows pan horizontally when they can't fit (pitch.css) -- this
+      // maintains the fade-in edge arrows that say which way more cards
+      // lie. Shared with matchup's .fxm-line, per the parity rule.
+      if (FXShared.attachScrollAffordance) FXShared.attachScrollAffordance(row);
     });
     container.appendChild(field);
 

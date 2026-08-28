@@ -34,6 +34,7 @@
         "src/shared/last5.js",
         "src/shared/gameweek.js",
         "src/shared/game-status.js",
+        "src/shared/scroll-affordance.js",
         "src/shared/lineup-alerts.js",
         "src/pitch-editor/state.js",
         "src/pitch-editor/roster.js",
@@ -49,6 +50,7 @@
       "css": [
         "src/shared/theme.css",
         "src/shared/touch-overlay.css",
+        "src/shared/scroll-affordance.css",
         "src/pitch-editor/pitch.css",
         "src/pitch-editor/card.css",
         "src/pitch-editor/tooltip.css",
@@ -67,6 +69,7 @@
         "src/shared/last5.js",
         "src/shared/gameweek.js",
         "src/shared/game-status.js",
+        "src/shared/scroll-affordance.js",
         "src/matchup/state.js",
         "src/matchup/parse.js",
         "src/matchup/render.js",
@@ -76,6 +79,7 @@
       "css": [
         "src/shared/theme.css",
         "src/shared/touch-overlay.css",
+        "src/shared/scroll-affordance.css",
         "src/matchup/matchup.css",
         "src/matchup/action-menu.css"
       ],

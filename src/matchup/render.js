@@ -1093,6 +1093,11 @@
     const line = el('div', 'fxm-line');
     line.dataset.pos = pos;
     players.forEach((p) => line.appendChild(renderCard(p, undefined, side)));
+    // Lines pan horizontally when they can't fit (matchup.css's narrow
+    // block) -- this maintains the fade-in edge arrows that say which way
+    // more cards lie. Shared with the roster's .fx-pitch__row, per the
+    // parity rule.
+    if (FXShared.attachScrollAffordance) FXShared.attachScrollAffordance(line);
     return line;
   }
 

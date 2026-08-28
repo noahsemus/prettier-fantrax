@@ -166,30 +166,6 @@
   box-sizing: border-box;
 }
 
-/* Narrow viewports: tighten each position row's gap so a 5-wide row of
-   the (also-shrunken -- see card.css's own 760px block) cards fits on one
-   line. Same breakpoint as matchup.css so the two pitches shrink in step.
-
-   If a row STILL can't fit (very small widths), it pans horizontally
-   instead of clipping: `safe center` keeps the row centered while it
-   fits but falls back to start-alignment once it overflows -- plain
-   `center` + overflow leaves the left half of the row unreachable, since
-   a scroll container can't scroll into negative space. The scrollbar is
-   hidden (touch swipe / trackpad panning still scroll); matchup.css's
-   own narrow block does the identical thing to .fxm-line. */
-@media (max-width: 760px) {
-  .fx-pitch__row {
-    gap: 6px;
-    overflow-x: auto;
-    justify-content: safe center;
-    scrollbar-width: none;
-  }
-
-  .fx-pitch__row::-webkit-scrollbar {
-    display: none;
-  }
-}
-
 /* Narrow (mobile, ~414px) viewports get a proportionally smaller field --
    shrink the circle to match, same fixed-px approach matchup.css uses at
    its own breakpoint. Box marks need no adjustment: their % widths already
@@ -217,6 +193,37 @@
   position: relative;
   z-index: 1;
 }
+
+/* Narrow viewports: tighten each position row's gap so a 5-wide row of
+   the (also-shrunken -- see card.css's own 760px block) cards fits on one
+   line. Same breakpoint as matchup.css so the two pitches shrink in step.
+
+   If a row STILL can't fit (very small widths), it pans horizontally
+   instead of clipping: `safe center` keeps the row centered while it
+   fits but falls back to start-alignment once it overflows -- plain
+   `center` + overflow leaves the left half of the row unreachable, since
+   a scroll container can't scroll into negative space. The scrollbar is
+   hidden (touch swipe / trackpad panning still scroll); matchup.css's
+   own narrow block does the identical thing to .fxm-line.
+
+   MUST come after the base .fx-pitch__row rule above: same specificity,
+   so source order decides, and an earlier placement let the base rule's
+   plain `justify-content: center` override `safe center` -- which is
+   exactly the unreachable-left bug, and it shipped once because the fix
+   was verified with injected !important rules that masked the cascade. */
+@media (max-width: 760px) {
+  .fx-pitch__row {
+    gap: 6px;
+    overflow-x: auto;
+    justify-content: safe center;
+    scrollbar-width: none;
+  }
+
+  .fx-pitch__row::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 
 .fx-bench {
   background: var(--fx-surface);
