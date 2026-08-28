@@ -342,3 +342,37 @@ body:not(.theme--dark) .fx-bench .fx-card__fpts--neg {
 body:not(.theme--dark) .fx-bench .fx-card__fpts--zero {
   color: var(--fx-pts-zero);
 }
+
+/* ---------- narrow viewports: shrink on-pitch cards, never wrap ----------
+   A full 5-wide position row of fixed 88px cards can't fit a phone
+   viewport, and .fx-pitch__row is deliberately nowrap now (see
+   pitch.css: wrapping turned formations into a nonsense 2-2-2-2-2 look).
+   So the cards themselves shrink instead -- mirroring matchup.css's own
+   narrow block value-for-value (58px cards, 32px crest, 9px name; with
+   pitch.css's 6px narrow gap, 5 * 58 + 4 * 6 = 314px fits comfortably)
+   and using the SAME 760px breakpoint so the two pitches shrink in step.
+   Scoped to .fx-pitch__row so bench cards keep their regular size, the
+   same way matchup scopes with :not(--bench). */
+@media (max-width: 760px) {
+  .fx-pitch__row .fx-card {
+    width: 58px;
+  }
+
+  .fx-pitch__row .fx-card__crest {
+    height: 32px;
+    max-width: 36px;
+  }
+
+  .fx-pitch__row .fx-card__name {
+    font-size: 9px;
+    max-width: 54px;
+  }
+
+  .fx-pitch__row .fx-card__fpts {
+    font-size: 10px;
+  }
+
+  .fx-pitch__row .fx-card__opp {
+    max-width: 54px;
+  }
+}

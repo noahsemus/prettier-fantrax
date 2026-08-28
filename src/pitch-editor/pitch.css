@@ -166,6 +166,15 @@
   box-sizing: border-box;
 }
 
+/* Narrow viewports: tighten each position row's gap so a 5-wide row of
+   the (also-shrunken -- see card.css's own 760px block) cards fits on one
+   line. Same breakpoint as matchup.css so the two pitches shrink in step. */
+@media (max-width: 760px) {
+  .fx-pitch__row {
+    gap: 6px;
+  }
+}
+
 /* Narrow (mobile, ~414px) viewports get a proportionally smaller field --
    shrink the circle to match, same fixed-px approach matchup.css uses at
    its own breakpoint. Box marks need no adjustment: their % widths already
@@ -179,11 +188,17 @@
   }
 }
 
+/* One position (D/M/F/G) = ONE row, never wrapped -- parity with the
+   matchup pitch's .fxm-line (user report: wrapping turned a 4-4-2 into a
+   nonsense 2-2-2-2-2 formation on narrow screens). Instead of wrapping,
+   the cards themselves shrink at the narrow breakpoint below, exactly the
+   way matchup.css handles a 5-wide line. */
 .fx-pitch__row {
   display: flex;
   justify-content: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
   position: relative;
   z-index: 1;
 }
