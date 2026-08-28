@@ -242,6 +242,12 @@
   // navigation's own renders are allowed to kick a sync within 1.5s.
   const QUICK_RETRY_MS = 1500;
   let quickRetryCount = 0; // consecutive non-commits while nothing is committed; reset on commit
+  // Why the most recent attempt failed to commit -- set by every guard and
+  // non-commit path in syncPointsData, surfaced (once per streak) after
+  // several consecutive failures so an app/console report of "breakdown
+  // never loads" names its own cause (chrome://inspect reaches the app's
+  // WebView console).
+  let lastNoCommitReason = null;
 
   function currentRetryDelay() {
     const uncommitted = getGameweekNumber() !== state.pointsCacheGwKey;
@@ -253,6 +259,9 @@
   function scheduleRetry() {
     if (retryTimer) return;
     quickRetryCount += 1;
+    if (quickRetryCount === 5) {
+      console.warn('[fx-points-sync] no successful stats sync after 5 attempts; last reason:', lastNoCommitReason);
+    }
     retryTimer = setTimeout(() => {
       retryTimer = null;
       if (!FXP.findLineupSystemNav || !FXP.findLineupSystemNav()) return; // roster page only
@@ -293,6 +302,7 @@
     // try/finally block that normally marks the attempt done.
     const earlyGwKey = getGameweekNumber();
     if (hasPendingLineupChanges()) {
+      lastNoCommitReason = 'pending lineup changes (Fantrax route guard would fire)';
       // Flipping tabs (or even just opening the period dropdown) right now
       // would trip Fantrax's own route guard -- see hasPendingLineupChanges
       // above. Back off exactly like the other early-return guards below;
@@ -307,12 +317,14 @@
     const tabs = findStatsTabs();
     const periodSelect = findSelectByLabel('Stats');
     if (!tabs || !periodSelect) {
+      lastNoCommitReason = !tabs ? 'Stats/Fantasy Points tabs not found on the page' : 'the Stats period dropdown was not found';
       state.pointsLastAttemptAt = Date.now(); // page isn't laid out as expected -- skip silently, but don't retry every render
       state.pointsSyncAttemptedGwKey = earlyGwKey;
       scheduleRetry();
       return;
     }
     if (overlayChildCount() > 0) {
+      lastNoCommitReason = 'an overlay/menu was open';
       state.pointsLastAttemptAt = Date.now(); // don't fight an already-open menu
       state.pointsSyncAttemptedGwKey = earlyGwKey;
       scheduleRetry();
@@ -347,13 +359,19 @@
       const isGwPeriodText = (text) => /^\d{4}([-/]\d{2,4})?\s*-\s*Game Week$/.test(text);
       let onGwPeriod = isGwPeriodText(periodSelect.textContent.trim());
       if (!onGwPeriod) onGwPeriod = await chooseSelectOption(periodSelect, isGwPeriodText);
-      if (overlayChildCount() > 0) return;
+      if (overlayChildCount() > 0) {
+        lastNoCommitReason = 'overlay opened mid-sync (after period flip)';
+        return;
+      }
 
       if (originalTabBtn !== tabs.fpts) {
         tabs.fpts.click();
         await delay(500);
       }
-      if (overlayChildCount() > 0) return;
+      if (overlayChildCount() > 0) {
+        lastNoCommitReason = 'overlay opened mid-sync (after tab flip)';
+        return;
+      }
 
       const breakdown = new Map();
       readAllRows().forEach(({ name, headers, cells }) => {
@@ -372,7 +390,10 @@
       // "truthy points" filter -- only '-'/empty (no stat recorded) is skipped.
       tabs.stats.click();
       await delay(500);
-      if (overlayChildCount() > 0) return;
+      if (overlayChildCount() > 0) {
+        lastNoCommitReason = 'overlay opened mid-sync (after Stats tab flip)';
+        return;
+      }
 
       const statRows = readAllRows();
       const raw = new Map();
@@ -458,6 +479,8 @@
       const rosterHasPlayers = !!document.querySelector('.i-table .scorer__info__name a');
       const emptyScrape = rosterHasPlayers && breakdown.size === 0;
 
+      if (gwChangedMidSync) lastNoCommitReason = 'gameweek changed mid-scrape';
+      else if (emptyScrape) lastNoCommitReason = 'scrape returned no rows (table mid-load)';
       if (!gwChangedMidSync && !emptyScrape) {
         state.breakdownCache = breakdown;
         state.rawStatsCache = raw;
@@ -471,6 +494,7 @@
       }
     } catch (err) {
       // best-effort background sync -- leave the previous cache in place
+      lastNoCommitReason = 'exception: ' + (err && err.message);
     } finally {
       if (!committed) {
         state.pointsLastAttemptAt = Date.now(); // didn't finish -- back off before the next attempt
