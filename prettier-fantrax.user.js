@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Prettier Fantrax
 // @description  Makes Fantrax prettier: a drag-and-drop pitch editor for your lineup, a head-to-head matchup pitch for live scoring, and stat tooltips that explain every number.
-// @version      0.2.11
+// @version      0.2.12
 // @author       Noah Semus
 // @homepageURL  https://github.com/noahsemus/prettier-fantrax
 // @icon         https://raw.githubusercontent.com/noahsemus/prettier-fantrax/main/icons/icon48.png
@@ -3273,6 +3273,15 @@ window.FXP = window.FXP || {};
   }
 
   function showCardTip(lines, x, y, p) {
+    // Hover tooltips are a fine-pointer (desktop) idiom -- on touch the
+    // action menu carries all of this. iOS synthesizes mouse events
+    // around taps and gestures (tap-as-hover emulation, post-touch
+    // compatibility events), and one of those slipped past the per-event
+    // guards after a completed drag-swap, parking this tooltip in the
+    // bottom corner with stale coordinates (reported live). Guarding at
+    // the single show choke point is airtight against every synthesis
+    // path; matchup's showTooltip carries the same guard.
+    if (window.matchMedia('(pointer: coarse)').matches) return;
     if (!lines || !lines.length) return;
     const el = ensureCardTip();
     el.innerHTML = '';
@@ -5490,6 +5499,11 @@ window.FXM = window.FXM || {};
   // otherwise overflow the viewport. Untouched by the touch/anchor work
   // below; see attachHoverTooltip's mouseenter/mousemove.
   function showTooltip(lines, x, y, p, side) {
+    // Fine-pointer only -- same synthesized-mouse-event guard as the
+    // roster pitch's showCardTip (see its comment): on touch, the action
+    // menu is the UI and iOS's tap-as-hover mouse synthesis must never
+    // conjure this tooltip.
+    if (window.matchMedia('(pointer: coarse)').matches) return;
     if (!lines || !lines.length) return;
     const tip = renderTooltipContent(lines);
     appendAverageSection(tip, p, side);

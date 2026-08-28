@@ -213,6 +213,11 @@
   // otherwise overflow the viewport. Untouched by the touch/anchor work
   // below; see attachHoverTooltip's mouseenter/mousemove.
   function showTooltip(lines, x, y, p, side) {
+    // Fine-pointer only -- same synthesized-mouse-event guard as the
+    // roster pitch's showCardTip (see its comment): on touch, the action
+    // menu is the UI and iOS's tap-as-hover mouse synthesis must never
+    // conjure this tooltip.
+    if (window.matchMedia('(pointer: coarse)').matches) return;
     if (!lines || !lines.length) return;
     const tip = renderTooltipContent(lines);
     appendAverageSection(tip, p, side);
