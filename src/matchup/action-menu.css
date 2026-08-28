@@ -142,3 +142,45 @@
   color: var(--fx-text-faint);
   font-style: italic;
 }
+
+/* "Season average" block (action-menu.js's buildAverageSection, touch
+   only) -- the upcoming player's preview figure, sitting between the
+   stats section and "Recent performances" and styled identically to the
+   last5 block above: same supporting-info treatment, same thin top
+   border instead of a second full divider. */
+.fxm-action-menu__avg {
+  cursor: default;
+  padding: 6px 10px 4px;
+  margin-top: 2px;
+  border-top: 1px solid var(--fx-border);
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.fxm-action-menu__avg-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fx-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 3px;
+}
+
+.fxm-action-menu__avg-title--loading {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--fx-text-faint);
+}
+
+.fxm-action-menu__avg-row {
+  font-size: 11px;
+  color: var(--fx-text-secondary);
+  line-height: 1.5;
+}
+
+.fxm-action-menu__avg-row--muted {
+  color: var(--fx-text-faint);
+  font-style: italic;
+}

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Prettier Fantrax",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Makes Fantrax prettier: a drag-and-drop pitch editor for your lineup, a head-to-head matchup pitch for live scoring, and stat tooltips that explain every number.",
   "icons": {
     "16": "icons/icon16.png",
@@ -32,6 +32,8 @@
         "src/shared/touch-overlay.js",
         "src/shared/fantrax-api.js",
         "src/shared/last5.js",
+        "src/shared/gameweek.js",
+        "src/shared/game-status.js",
         "src/shared/lineup-alerts.js",
         "src/pitch-editor/state.js",
         "src/pitch-editor/roster.js",
@@ -63,6 +65,8 @@
         "src/shared/touch-overlay.js",
         "src/shared/fantrax-api.js",
         "src/shared/last5.js",
+        "src/shared/gameweek.js",
+        "src/shared/game-status.js",
         "src/matchup/state.js",
         "src/matchup/parse.js",
         "src/matchup/render.js",

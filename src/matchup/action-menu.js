@@ -297,6 +297,60 @@
     return container;
   }
 
+  // ---------- "Season average" (last5.js's shared game log) ----------
+  // Touch counterpart of render.js's hover-tooltip appendAverageSection:
+  // same upcoming-only gating, same cached/loading/patch idiom as
+  // buildLast5Section above, and literally the same underlying fetch
+  // (last5.js's getGameLog) -- a menu showing both recent form and the
+  // average costs one request, not two.
+  function renderAverageRows(avg) {
+    const nodes = [];
+    const title = document.createElement('div');
+    title.className = 'fxm-action-menu__avg-title';
+    title.textContent = 'Season average';
+    nodes.push(title);
+    const row = document.createElement('div');
+    if (avg === null) {
+      row.className = 'fxm-action-menu__avg-row fxm-action-menu__avg-row--muted';
+      row.textContent = 'No games on record';
+    } else {
+      row.className = 'fxm-action-menu__avg-row';
+      row.textContent = `${avg} pts/game`;
+    }
+    nodes.push(row);
+    return nodes;
+  }
+
+  // Same re-render-in-place caveats and identity guards as refreshLast5UI
+  // above -- by resolve time the menu may belong to someone else entirely.
+  function refreshAverageUI(name, side, avg) {
+    if (!state.actionMenuEl || !state.actionMenuIdentity) return;
+    if (state.actionMenuIdentity.name !== name || state.actionMenuIdentity.side !== side) return;
+    const container = state.actionMenuEl.querySelector('.fxm-action-menu__avg');
+    if (!container) return;
+    container.innerHTML = '';
+    renderAverageRows(avg).forEach((n) => container.appendChild(n));
+  }
+
+  function buildAverageSection(p, side) {
+    if (!FXShared.getSeasonAverage) return null;
+    if (FXM.gameState(p.gameText) !== 'upcoming') return null;
+    const teamId = side === 'home' ? state.homeTeamId : state.awayTeamId;
+    const container = document.createElement('div');
+    container.className = 'fxm-action-menu__avg';
+    const cached = FXShared.peekSeasonAverage(p.name, teamId);
+    if (cached !== undefined) {
+      renderAverageRows(cached).forEach((n) => container.appendChild(n));
+    } else {
+      const loading = document.createElement('div');
+      loading.className = 'fxm-action-menu__avg-title fxm-action-menu__avg-title--loading';
+      loading.textContent = 'Season average: loading…';
+      container.appendChild(loading);
+      FXShared.getSeasonAverage(p.name, teamId).then((avg) => refreshAverageUI(p.name, side, avg));
+    }
+    return container;
+  }
+
   function onDocClick(e) {
     if (state.actionMenuEl && !state.actionMenuEl.contains(e.target)) closeActionMenu();
   }
@@ -385,9 +439,11 @@
     if (coarse) {
       const statsSection = buildStatsSection(p);
       if (statsSection) menu.appendChild(statsSection);
+      const averageSection = buildAverageSection(p, side);
+      if (averageSection) menu.appendChild(averageSection);
       const last5Section = buildLast5Section(p, side);
       if (last5Section) menu.appendChild(last5Section);
-      if (statsSection || last5Section) {
+      if (statsSection || averageSection || last5Section) {
         const divider = document.createElement('div');
         divider.className = 'fxm-action-menu__divider';
         menu.appendChild(divider);
@@ -541,6 +597,17 @@
     if (oldStats) {
       const freshStats = buildStatsSection(p);
       if (freshStats) oldStats.replaceWith(freshStats);
+    }
+    // Same idea for the season-average block -- cached means a cheap
+    // synchronous re-render; still-loading means buildAverageSection calls
+    // FXShared.getSeasonAverage again, which just returns the SAME
+    // in-flight promise (last5.js dedupes per player) plus one more
+    // identity-guarded refreshAverageUI callback.
+    const oldAverage = menu.querySelector('.fxm-action-menu__avg');
+    if (oldAverage) {
+      const freshAverage = buildAverageSection(p, identity.side);
+      if (freshAverage) oldAverage.replaceWith(freshAverage);
+      else oldAverage.remove();
     }
     // Same idea for the last-5 block -- if it's already cached this is a
     // cheap synchronous re-render (no new fetch); if it's still loading,

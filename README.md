@@ -146,11 +146,17 @@ to go back to Fantrax's normal list.
   player playing" indicator when one exists (green = confirmed
   starting, orange = expected to play, amber = expected on the real
   bench, red = not expected to play) -- the same colors Fantrax's own
-  list uses, just surfaced on the pitch view too.
+  list uses, just surfaced on the pitch view too. Once a game kicks
+  off, the dot goes live: green while the player is actually on the
+  pitch, amber while they sit on the real bench, and no dot once the
+  game has finished. Both pitches use the same rules.
 - **Hover a player** to see how they got their points -- a breakdown
   by scoring stat (goals, tackles, clean sheet, etc.) for the
-  gameweek -- or, if they haven't played yet, their projected points.
-  Switching to a future gameweek shows projections for everyone.
+  gameweek -- or, if they haven't played yet, their season average.
+  Switching to a future gameweek shows every player's season average
+  as the card's preview number; on the active gameweek a not-yet-played
+  player shows a plain 0, since "hasn't scored yet" is real information
+  there.
 - **Loading states instead of flicker.** While the first background
   stat sync for a gameweek runs, the pitch shows a spinner and
   skeleton cards rather than rendering numbers that immediately
@@ -174,7 +180,7 @@ that doesn't take reports itself plainly instead of pretending it
 worked.
 
 Tapping a player on a touch screen opens an action menu with their
-projection, their **recent performances** (last few gameweek scores
+season average, their **recent performances** (last few gameweek scores
 with opponents, for players whose game hasn't kicked off yet), and the
 real actions above.
 
@@ -286,8 +292,14 @@ src/
                          `theme--dark` body class (light = no class)
     fantrax-api.js       same-origin POST helper for Fantrax's own /fxpa/req
                          endpoint -- see the note at the top of this README
-    last5.js             "recent performances" lookup + session cache, shared
-                         by both pitches (one league-wide player lookup total)
+    last5.js             per-player game log (recent performances + season
+                         average), shared by both pitches (one league-wide
+                         player lookup total)
+    gameweek.js          "is the displayed gameweek in the future?" -- parsed
+                         from the Gameweek selector's own date range
+    game-status.js       ONE classifier for live/finished/upcoming games and
+                         the "is this player on the pitch?" rule, so the two
+                         pitches can never drift on status logic
     lineup-alerts.js     detects a starter benched/left out by their real club,
                          and delivers the warning (banner + notification)
   content/               Live Scoring: hybrid stat tooltips + Fpts default
@@ -307,8 +319,9 @@ src/
     tabs.js                injects/toggles the "Pitch Editor" pill
     render.js              builds the pitch + bench cards
     drag.js                drag/click-to-arm interactions, legal-target highlighting
-    tooltip.js             hover tooltip (points breakdown / projection)
-    points-sync.js         background scrape of Fantrax's Fantasy Points + Projected views
+    tooltip.js             hover tooltip (points breakdown / season average)
+    points-sync.js         background scrape of Fantrax's Fantasy Points/Stats views
+                           (per-gameweek points, breakdowns, season average)
     swap.js                drives Fantrax's real lineup buttons to perform a swap
     action-menu.js         per-player menu (Start Swap / Trade / Drop / View Player Card,
                            plus stats + recent performances on touch)
@@ -384,15 +397,17 @@ looked up once the page actually runs, not while the files are loading.
   "locked" (can't be dragged) unless their fixture cell shows an
   upcoming kickoff time like "3:00PM" -- that's deliberately
   conservative.
-- The points breakdown / projection (`src/pitch-editor/points-sync.js`)
+- The points breakdown / season average (`src/pitch-editor/points-sync.js`)
   works the same way as the live-scoring snapshot above, but across
   two controls instead of one: Fantrax's own "Stats / Fantasy Points"
   tabs (to read each stat's point contribution) and its
-  "Stats: <period>" dropdown (flipped to "Projected - Per Game" to read
-  an unplayed gameweek's projection). Both get flipped back to whatever
-  the user had immediately after, and the whole sequence is masked with
-  the same CSS-visibility trick (`fx-syncing`), throttled to once a
-  minute.
+  "Stats: <period>" dropdown -- flipped to the "<season> - Game Week"
+  option so every number read (points, breakdown, raw stats) belongs to
+  the gameweek actually on screen, then to "<season> - YTD" to read the
+  FP/G column (each player's true season average). Everything gets
+  flipped back to whatever the user had immediately after, and the whole
+  sequence is masked with the same CSS-visibility trick (`fx-syncing`),
+  throttled to once a minute.
 - The pitch editor replaces Fantrax's list view by inserting a third
   **"Pitch Editor"** button into the real "Lineup change system" pill
   group (next to "Easy Click" / "Classic"), styled to match rather than

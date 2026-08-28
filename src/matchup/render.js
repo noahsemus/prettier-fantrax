@@ -165,6 +165,49 @@
     });
   }
 
+  // ---------- season average, in the hover tooltip ----------
+  // Labeled companion to the recent-performances section above -- same
+  // gating (upcoming games only), same async peek/fetch/patch idiom, and
+  // literally the same underlying request (last5.js's shared game log), so
+  // a hover that loads recent form gets the average for free. Own
+  // container class so the resolve callback can re-locate exactly this
+  // section, and the patch touches ONLY this element -- never a re-render,
+  // which would rebuild the hovered card and flicker/drop the hover state.
+  function renderAverageInto(section, avg) {
+    section.appendChild(el('div', 'fxm-tip__recent-title', 'Season average'));
+    if (avg === null) {
+      section.appendChild(el('div', 'fxm-tip__row fxm-tip__recent-muted', 'No games on record'));
+    } else {
+      section.appendChild(el('div', 'fxm-tip__row', `${avg} pts/game`));
+    }
+  }
+
+  function appendAverageSection(tip, p, side) {
+    if (!p || !FXShared.getSeasonAverage) return;
+    if (gameState(p.gameText) !== 'upcoming') return;
+    const teamId = side === 'home' ? state.homeTeamId : state.awayTeamId;
+    const section = el('div', 'fxm-tip__avg');
+    tip.appendChild(section);
+
+    const cached = FXShared.peekSeasonAverage(p.name, teamId);
+    if (cached !== undefined) {
+      renderAverageInto(section, cached);
+      return;
+    }
+    section.appendChild(el('div', 'fxm-tip__recent-title', 'Season average: loading…'));
+    FXShared.getSeasonAverage(p.name, teamId).then((avg) => {
+      // Only paint if this same player is still hovered -- the pointer may
+      // have moved on, or the tooltip been rebuilt for someone else.
+      if (state.hoveredName !== p.name) return;
+      if (!state.tooltipEl || !state.tooltipEl.classList.contains('fxm-tip--visible')) return;
+      const live = state.tooltipEl.querySelector('.fxm-tip__avg');
+      if (!live) return;
+      live.innerHTML = '';
+      renderAverageInto(live, avg);
+      positionTooltip(state.lastMouseX, state.lastMouseY);
+    });
+  }
+
   // Desktop mouse path only -- positions the tip near the live cursor
   // coordinates, flipping to the other side of the pointer if it would
   // otherwise overflow the viewport. Untouched by the touch/anchor work
@@ -172,6 +215,7 @@
   function showTooltip(lines, x, y, p, side) {
     if (!lines || !lines.length) return;
     const tip = renderTooltipContent(lines);
+    appendAverageSection(tip, p, side);
     appendRecentSection(tip, p, side);
     positionTooltip(x, y);
   }
@@ -239,29 +283,25 @@
   // Classifies a player's game from parse.js's p.gameText -- see parseSide's
   // comment for why this is necessary (the same DOM cell holds a real score
   // once the game starts and a mere projection before it, with no other
-  // visible difference). 'finished' = trailing " F" (e.g. "CRY 0 @ EVE 2
-  // F"); 'upcoming' = a scheduled clock time instead of a score (e.g.
-  // "@FUL Mon 3:00 PM"); anything else falls back to 'unknown' and is
-  // treated like 'finished' for display purposes -- i.e. trust the number
-  // as real unless it's positively identified as a pre-game projection.
+  // visible difference).
   //
-  // No dedicated 'live'/in-progress state: checked the real livescoring DOM
-  // across every open matchup/tab available (2026-08-24 -- a mix of
-  // finished Sat/Sun games and Monday games not yet kicked off) and never
-  // observed a gameText that was neither a trailing " F" score nor a
-  // scheduled clock time, so there's nothing to confirm what an in-progress
-  // row's text actually looks like. Rather than guess a regex for it, an
-  // unrecognized gameText just stays 'unknown'. Still used by
-  // buildTooltipLines (finished vs upcoming messaging) and renderCard (never
-  // showing an upcoming player's projection as if it were an earned score)
-  // -- NOT by the status dot any more, see EVENT_STATUS_LABEL/renderCard
-  // below, which reads Fantrax's own pre-kickoff `.scorer-icon` indicator
-  // instead (parse.js's p.eventStatus).
+  // The 'live' state matters because Fantrax's own fpts `dd` cell is NOT a
+  // real earned score during a live game -- confirmed live: 13' into a
+  // 0-0 game, a player with ZERO recorded stat chips had dd = 5.79 (his
+  // projection), and two teammates' dd values were similarly
+  // projection-sized. Same conclusion as the earlier Joao Pedro diagnosis
+  // (dd ~18.4 vs a true live total of 11). So for a live player the dd
+  // must never be shown as points -- see resolvePoints/renderCard.
+  //
+  // Delegates to the ONE shared classifier (src/shared/game-status.js) so
+  // this page and the roster pitch can never drift on what counts as
+  // live/finished/upcoming again -- the previous local copy missed
+  // halftime ("MCI 1 @ CRY 0 Halftime" classified 'unknown'), which both
+  // hid the live dot and re-opened the projection-dd fallback. Kept as a
+  // local name because everything in this feature (and action-menu.js via
+  // FXM.gameState) already calls it.
   function gameState(gameText) {
-    if (!gameText) return 'unknown';
-    if (/\sF$/.test(gameText)) return 'finished';
-    if (/\d{1,2}:\d{2}\s*[AP]M/i.test(gameText)) return 'upcoming';
-    return 'unknown';
+    return FXShared.classifyGame(gameText);
   }
 
   // Status-dot label text, mirroring pitch-editor/roster.js's
@@ -372,6 +412,13 @@
       });
       return String(Math.round(sum * 100) / 100);
     }
+    // A LIVE game's dd is a projection, not an earned score (see
+    // gameState's own comment for the live confirmation) -- so when no
+    // per-stat fpts reading exists yet for a live player, the honest
+    // answer is 0 ("nothing recorded yet"), never dd. content.js's next
+    // masked Stats/Fpts snapshot (at most ~30s away on this page)
+    // populates FXC and upgrades this to the accurate summed total above.
+    if (gameState(p.gameText) === 'live') return '0';
     return p.points;
   }
 
@@ -431,30 +478,36 @@
     // makes sense depends on whether their game has actually happened yet
     // (see gameState) -- otherwise "hasn't played" reads as a promise
     // they'll still get a chance to when their game already finished with
-    // them not featuring at all.
+    // them not featuring at all. The old "Projected: X pts" lines are gone
+    // from every branch: dd holds Fantrax's projection for both upcoming
+    // AND live games, and projections are no longer shown anywhere (user
+    // request 2026-08-28) -- an upcoming player's tooltip instead carries
+    // the labeled "Season average" section appendAverageSection adds.
     const state = gameState(p.gameText);
+    if (state === 'live') {
+      // Only reachable when the player has NO stat chips and no FXC entry
+      // (anyone with either returned a breakdown above) -- and a live-game
+      // player with zero recorded stats is one who started on the real
+      // bench and hasn't come on: a starter always carries at least the GS
+      // chip from kickoff (confirmed live -- see the dot logic's comment).
+      return ['Game in progress — on the bench so far'];
+    }
     if (state === 'upcoming') {
       // A player with an eventStatus (only ever set pre-kickoff -- see
       // parse.js/roster.js's readEventStatus) has a colored status dot next
       // to their name, but the dot's only explanation is an HTML `title`
       // attribute, which never shows on a tap/touch device. Prepend its
       // label (e.g. "Not expected to play") as its own line here so the
-      // tooltip itself carries that explanation on mobile too, ahead of the
-      // projected/no-stats line below.
+      // tooltip itself carries that explanation on mobile too.
       const statusLine = p.eventStatus ? [EVENT_STATUS_LABEL[p.eventStatus]] : [];
-      if (p.points && p.points !== '-') return [...statusLine, `Projected: ${p.points} pts`];
       return [...statusLine, "No stats yet — hasn't played"];
     }
     if (state === 'finished') {
       return ['Did not play this gameweek'];
     }
-    // unknown -- best effort, same as before this distinction existed. Same
-    // eventStatus prepend as the 'upcoming' branch above, for consistency --
-    // in practice a player with eventStatus set is always classified
-    // 'upcoming', but this branch duplicates the same projected/no-stats
-    // logic so it gets the same treatment rather than silently diverging.
+    // unknown -- best effort. Same eventStatus prepend as the 'upcoming'
+    // branch above, for consistency.
     const statusLine = p.eventStatus ? [EVENT_STATUS_LABEL[p.eventStatus]] : [];
-    if (p.points && p.points !== '-') return [...statusLine, `Projected: ${p.points} pts`];
     return [...statusLine, "No stats yet — hasn't played"];
   }
 
@@ -616,15 +669,54 @@
     //
     // For an upcoming (not-yet-started) game, p.points actually holds
     // Fantrax's own PROJECTION for this cell, not a score -- showing that
-    // on the card would look like an already-earned result. Force the
-    // muted zero there instead; the projection still surfaces on hover
-    // (see buildTooltipLines).
+    // on the card would look like an already-earned result. So an upcoming
+    // player shows: their SEASON AVERAGE when the whole displayed gameweek
+    // is in the future (state.isFutureGameweek -- src/shared/gameweek.js;
+    // on a week that hasn't begun, every number on the pitch is clearly a
+    // preview), and a muted 0 on the active week, where "hasn't scored
+    // yet" is real information. A LIVE game's number comes from
+    // resolvePoints, which sums FXC's per-stat readings and refuses the
+    // projection-contaminated dd (see gameState/resolvePoints comments).
     const isUpcoming = gameState(p.gameText) === 'upcoming';
-    const resolvedPoints = isUpcoming ? null : resolvePoints(p);
-    const ptsText = resolvedPoints && resolvedPoints !== '-' ? resolvedPoints : '0';
+    let ptsText = '0';
+    let pendingAverage = null;
+    if (!isUpcoming) {
+      const resolvedPoints = resolvePoints(p);
+      ptsText = resolvedPoints && resolvedPoints !== '-' ? resolvedPoints : '0';
+    } else if (state.isFutureGameweek && FXShared.getSeasonAverage) {
+      const teamId = side === 'home' ? state.homeTeamId : state.awayTeamId;
+      const avg = FXShared.peekSeasonAverage(p.name, teamId);
+      if (avg !== undefined) {
+        if (avg !== null) ptsText = String(avg);
+      } else {
+        pendingAverage = { teamId, key: FXShared.last5CacheKey(p.name, teamId) };
+      }
+    }
     const ptsN = parseFloat(ptsText);
     const ptsKind = ptsN > 0 ? 'pos' : ptsN < 0 ? 'neg' : 'zero';
-    info.appendChild(el('div', `fxm-card__pts fxm-card__pts--${ptsKind}`, ptsText));
+    const ptsEl = el('div', `fxm-card__pts fxm-card__pts--${ptsKind}`, ptsText);
+    info.appendChild(ptsEl);
+    // Average not cached yet: fetch it and patch THIS ONE element when it
+    // arrives -- never a full re-render, which tears down every card
+    // (yanking the hovered one out from under the pointer -- the exact
+    // hover-flicker bug of a previous attempt) and, worse, re-attaches a
+    // fresh callback per still-pending player per pass, which cascaded
+    // into a tab-freezing render storm. state.averageFetchPending caps it
+    // at ONE outstanding callback per player: renderCard runs again on
+    // every live-score re-render, and last5.js dedupes the fetch itself,
+    // but nothing deduped the callbacks without this.
+    if (pendingAverage && !state.averageFetchPending.has(pendingAverage.key)) {
+      state.averageFetchPending.add(pendingAverage.key);
+      FXShared.getSeasonAverage(p.name, pendingAverage.teamId).then((avg) => {
+        state.averageFetchPending.delete(pendingAverage.key);
+        // The card may have been rebuilt/removed by an unrelated re-render
+        // while this was in flight -- patch only the still-live element.
+        if (avg === null || !ptsEl.isConnected) return;
+        const an = parseFloat(avg);
+        ptsEl.className = `fxm-card__pts fxm-card__pts--${an > 0 ? 'pos' : an < 0 ? 'neg' : 'zero'}`;
+        ptsEl.textContent = String(avg);
+      });
+    }
     // Game/opponent line (e.g. "MUN 0 @ HUL 2 F"), directly under the
     // points -- same formatting logic as pitch-editor's .fx-card__opp
     // (FXShared.formatOpp, src/shared/touch-overlay.js: shared LOGIC, own
@@ -661,10 +753,34 @@
     // own CSS comment for why the opp line needs a left-padding reservation
     // that a dot-less card must NOT get (unconditional padding would misalign
     // every non-dotted card's opp line for nothing).
-    if (p.name && p.eventStatus) {
+    // During a LIVE game Fantrax's own scorer-icon is gone, so the dot is
+    // derived instead (user request 2026-08-28: "if a player is actively
+    // playing in a game they should have a green dot; no dot only once
+    // games are finished/historical"): green for a player who's actually
+    // on the pitch, amber for one still on the real bench. "On the pitch"
+    // = has any recorded stat chip -- a starter always carries at least
+    // the GS (games started) chip from kickoff (confirmed live: two
+    // starters showed "GS 1" at 13' while the benched Munoz had none).
+    let dotStatus = p.eventStatus || null;
+    let dotTitle = dotStatus ? EVENT_STATUS_LABEL[dotStatus] || '' : '';
+    if (!dotStatus && gameState(p.gameText) === 'live') {
+      // Shared on-pitch rule (src/shared/game-status.js) over the card's
+      // own chips, falling back to FXC's captured maps -- same rule the
+      // roster pitch applies to its own stat source, so the two pages
+      // can't disagree about who's on the pitch.
+      const fxc = window.FXC;
+      const onPitch =
+        FXShared.hasOnPitchStats &&
+        (FXShared.hasOnPitchStats(p.chips) ||
+          FXShared.hasOnPitchStats(fxc && fxc.fpts && fxc.fpts.get(p.name)) ||
+          FXShared.hasOnPitchStats(fxc && fxc.raw && fxc.raw.get(p.name)));
+      dotStatus = onPitch ? 'starting' : 'bench';
+      dotTitle = onPitch ? 'Playing now' : 'On the bench';
+    }
+    if (p.name && dotStatus) {
       card.classList.add('fxm-card--has-dot');
-      const dot = el('span', `fxm-card__dot fxm-card__dot--${p.eventStatus}`);
-      dot.title = EVENT_STATUS_LABEL[p.eventStatus] || '';
+      const dot = el('span', `fxm-card__dot fxm-card__dot--${dotStatus}`);
+      dot.title = dotTitle;
       card.appendChild(dot);
     }
     // Skip hover wiring on empty slots -- parse.js never actually hands us
@@ -1125,6 +1241,11 @@
     // action-menu.js's last-5 lookup needs this.
     state.homeTeamId = data.home.header.teamId;
     state.awayTeamId = data.away.header.teamId;
+    // Refreshed every render too: gates the season-average preview number
+    // on cards (see renderCard + src/shared/gameweek.js). Re-read each
+    // time because the user switches gameweeks via this page's own
+    // Gameweek select without any page load.
+    state.isFutureGameweek = !!(FXShared.isFutureGameweek && FXShared.isFutureGameweek());
 
     if (state.bodyEl) state.bodyEl.remove();
     const body = el('div', 'fxm-body');

@@ -14,8 +14,7 @@ window.FXP = window.FXP || {};
   'use strict';
 
   FXP.POS_ORDER = ['G', 'D', 'M', 'F'];
-  FXP.POINTS_SYNC_THROTTLE_MS = 60000; // don't re-scrape the breakdown/projection tables more than every 60s
-  FXP.PROJECTED_OPTION_TEXT = 'Projected - Per Game';
+  FXP.POINTS_SYNC_THROTTLE_MS = 60000; // don't re-scrape the breakdown/average tables more than every 60s
 
   FXP.state = {
     container: null,
@@ -44,9 +43,16 @@ window.FXP = window.FXP || {};
     // closeActionMenu alongside actionMenuEl. See action-menu.js.
     actionMenuPlayerKey: null,
 
-    // hover: how a player got their points (or their projection, if unplayed)
+    // hover: how a player got their points (or their season average, if unplayed)
     breakdownCache: new Map(), // name -> { lines: [{abbr, label, text}] }
-    projectedCache: new Map(), // name -> projected FPts text for this gameweek
+    averageCache: new Map(), // name -> season-average FPts text (the roster table's own FP/G column)
+    // name -> the VIEWED GAMEWEEK's own FPts text (read with the period
+    // dropdown scoped to that gameweek -- see points-sync.js). What a
+    // locked player's card/tooltip shows; p.fptsText can't be used for
+    // that, since the table's own FPts column follows the user's period
+    // selection (default YTD = season totals, i.e. last week's points
+    // polluting this week's cards -- a real reported bug).
+    gwPointsCache: new Map(),
     pointsCacheAt: 0,
     pointsCacheGwKey: null,
     pointsSyncInFlight: false,

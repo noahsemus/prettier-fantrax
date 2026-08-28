@@ -8,14 +8,14 @@
  *
  * ---------- initial-load / gameweek-switch loading state ----------
  * points-sync.js briefly flips Fantrax's real Stats/Fantasy Points tabs
- * (and the Stats period dropdown) to scrape per-player points/projection
- * data -- see that file's header comment for why, and how it masks the
+ * (and, rarely, the Stats period dropdown) to scrape per-player points and
+ * season-average data -- see that file's header comment for why, and how it masks the
  * flip itself. That masking hides the REAL table's churn, but the pitch
  * cards render() builds are still visibly affected: the very first render
  * for a gameweek necessarily uses whatever numbers happen to already be on
  * the page (no synced cache exists yet), then a couple of seconds later --
  * once the sync completes -- a second render swaps in the freshly-synced
- * breakdown/projection numbers. Two renders, same cards, different numbers:
+ * breakdown/average numbers. Two renders, same cards, different numbers:
  * exactly the "ui swapping and numbers updating" a user notices.
  *
  * render() avoids that by checking needsInitialSync: true only when the
@@ -39,6 +39,14 @@
   const qa = FXP.qa;
   const state = FXP.state;
   const FXShared = window.FXShared;
+
+  // ---------- live-game detection from the roster's own Opp cell ----------
+  // Delegates to the ONE shared classifier (src/shared/game-status.js,
+  // which documents the confirmed text formats of BOTH pages) so the two
+  // pitches can never drift on what counts as live.
+  function isLiveGame(oppText) {
+    return FXShared.classifyGame && FXShared.classifyGame(oppText) === 'live';
+  }
 
   // ---------- jersey images (borrowed from Fantrax's own read-only pitch widget) ----------
 
@@ -250,7 +258,7 @@
     hint.textContent =
       'Drag a player onto another to swap them, or click a player for more actions. Only ' +
       'legal targets light up while dragging or after "Start Swap". Hover a player to see ' +
-      "how they got their points, or their projection if they haven't played yet. Switch to " +
+      "how they got their points, or their season average if they haven't played yet. Switch to " +
       '"Easy Click" or "Classic" above to use Fantrax\'s own list instead.';
     container.appendChild(hint);
 
@@ -401,10 +409,28 @@
 
       const name = document.createElement('div');
       name.className = 'fx-card__name';
-      if (p.eventStatus) {
+      // Fantrax's own scorer-icon (p.eventStatus) exists only pre-kickoff,
+      // so during a LIVE game the dot is derived instead (user request
+      // 2026-08-28): green for a player actually on the pitch, amber for
+      // one still on the real bench. "On the pitch" = has any raw stat
+      // recorded for this gameweek (points-sync's rawStatsCache, now
+      // gameweek-scoped) -- a starter always has at least GS 1 there.
+      // No dot once the game is finished (or on historical weeks): the
+      // real number has replaced the question the dot answers.
+      let dotStatus = p.eventStatus || null;
+      let dotTitle = dotStatus ? FXP.EVENT_STATUS_LABEL[dotStatus] || '' : '';
+      if (!dotStatus && p.locked && isLiveGame(p.oppText)) {
+        // Shared on-pitch rule (src/shared/game-status.js) -- NOT a bare
+        // "has any raw-stat entry" check: gameweek-scoped stat cells read
+        // "0" for benched players, so that painted the whole bench green.
+        const onPitch = FXShared.hasOnPitchStats && FXShared.hasOnPitchStats(state.rawStatsCache.get(p.name));
+        dotStatus = onPitch ? 'starting' : 'bench';
+        dotTitle = onPitch ? 'Playing now' : 'On the bench';
+      }
+      if (dotStatus) {
         const dot = document.createElement('span');
-        dot.className = `fx-card__dot fx-card__dot--${p.eventStatus}`;
-        dot.title = FXP.EVENT_STATUS_LABEL[p.eventStatus] || '';
+        dot.className = `fx-card__dot fx-card__dot--${dotStatus}`;
+        dot.title = dotTitle;
         name.appendChild(dot);
       }
       // The dot (real-life event-status indicator) stays put outside the
@@ -417,20 +443,34 @@
       name.appendChild(nameInner);
       info.appendChild(name);
 
-      // For a player who hasn't played in the CURRENTLY VIEWED gameweek --
-      // whether that's a future gameweek picked from the Gameweek selector,
-      // or the current one pre-kickoff -- p.fptsText reflects whatever
-      // Fantrax's own FPts column shows for that (unplayed) week, which
-      // isn't a meaningful "points" figure yet. Prefer the background-
-      // synced projection (points-sync.js's state.projectedCache, already
-      // keyed to the currently-selected gameweek via pointsCacheGwKey) when
-      // one's available, so switching to a future gameweek shows THAT
-      // week's projected points instead of a stale/blank number left over
-      // from whatever was last on screen.
+      // For a player who hasn't played in the CURRENTLY VIEWED gameweek,
+      // p.fptsText reflects whatever Fantrax's own FPts column shows for
+      // that (unplayed) week, which isn't a meaningful "points" figure
+      // yet. What replaces it depends on WHICH week is on screen (see
+      // src/shared/gameweek.js):
+      //   - a FUTURE gameweek: their season average (points-sync.js's
+      //     state.averageCache, the roster table's own FP/G column) -- a
+      //     labeled-by-context preview of what they usually score;
+      //   - the ACTIVE (or a past) gameweek: a plain 0 -- there, "hasn't
+      //     scored yet" is real information, and any other number
+      //     (average, or Fantrax's projection, which used to show here)
+      //     reads as a fake earned score. Per user request 2026-08-28.
       let fptsText = p.fptsText;
-      if (!p.locked && state.projectedCache) {
-        const projected = state.projectedCache.get(p.name);
-        if (projected !== undefined && projected !== null && projected !== '-') fptsText = projected;
+      if (p.locked) {
+        // Locked (game live or finished): the viewed gameweek's own points
+        // (points-sync.js's gwPointsCache -- see state.js for why
+        // p.fptsText, the table's period-scoped FPts column, can't serve
+        // here). '-' means Fantrax reports no score for them this week
+        // (e.g. an unused sub) -- that's an earned 0, shown as one.
+        const gwPts = state.gwPointsCache.get(p.name);
+        if (gwPts !== undefined && gwPts !== null && gwPts !== '') {
+          fptsText = gwPts === '-' ? '0' : gwPts;
+        }
+      } else if (FXShared.isFutureGameweek && FXShared.isFutureGameweek()) {
+        const average = state.averageCache.get(p.name);
+        fptsText = average !== undefined && average !== null && average !== '-' ? average : '0';
+      } else {
+        fptsText = '0';
       }
       if (fptsText && fptsText !== '-') {
         const fpts = document.createElement('div');
@@ -466,6 +506,7 @@
   }
 
   FXP.buildJerseyMap = buildJerseyMap;
+  FXP.isLiveGame = isLiveGame;
   FXP.jerseyFromCrest = jerseyFromCrest;
   FXP.buildLoadingOverlay = buildLoadingOverlay;
   FXP.ensureContainer = ensureContainer;

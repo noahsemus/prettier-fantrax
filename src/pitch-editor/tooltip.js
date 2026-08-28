@@ -2,7 +2,7 @@
  * Prettier Fantrax -- Pitch Editor: hover tooltip
  * ---------------------------------------------------------------------
  * How a player got their points (a breakdown by scoring stat), or their
- * projection for the gameweek if they haven't played yet. Data comes from
+ * season average if they haven't played yet. Data comes from
  * points-sync.js's background cache. For a locked (already-played) player,
  * each breakdown line leads with the raw count, followed by the stat name,
  * then the signed points contribution in parentheses, e.g. "4 Saves (+2)"
@@ -10,12 +10,12 @@
  * that stat yet. For a not-yet-played player who also has a pre-kickoff
  * status dot (p.eventStatus, roster.js's FXP.EVENT_STATUS_LABEL), the
  * dot's own explanation (e.g. "Not expected to play") is prepended as the
- * first line, ahead of the projection line -- the dot's `title` attribute
+ * first line, ahead of the season-average line -- the dot's `title` attribute
  * never shows on a tap/touch device, so the tooltip is what carries that
  * explanation on mobile.
  *
  * buildTooltipLines(p) returns an array whose entries are either a plain
- * string (title/loading/projection/fallback lines, rendered via
+ * string (title/loading/season-average/fallback lines, rendered via
  * textContent) or, for a hybrid raw+points line, an object
  * { text: '4 Saves', pts: '+2' } -- text is the raw-count/stat-name part,
  * pts is the already-signed points value WITHOUT its parentheses. Rendering
@@ -167,11 +167,27 @@
     if (p.locked) {
       const entry = state.breakdownCache.get(p.name);
       if (!entry) return ['Loading points breakdown…'];
+      // Same gameweek-scoped points figure the card shows (see render.js's
+      // locked branch) -- p.fptsText follows the user's period dropdown
+      // (default YTD = season totals), so it can't headline a
+      // this-gameweek breakdown.
+      const gwPtsRaw = state.gwPointsCache.get(p.name);
+      const gwPts = gwPtsRaw !== undefined && gwPtsRaw !== null && gwPtsRaw !== ''
+        ? (gwPtsRaw === '-' ? '0' : gwPtsRaw)
+        : p.fptsText;
       if (!entry.lines.length) {
-        return [`${p.fptsText || '0'} pts — no scoring stats this gameweek`];
+        // Live game, no scoring lines: distinguish a player who's ON the
+        // pitch without scored points from one still on the real bench,
+        // via the same shared rule the dots use (game-status.js's
+        // hasOnPitchStats). Mirrors the matchup tooltip's live wording.
+        if (FXP.isLiveGame && FXP.isLiveGame(p.oppText)) {
+          const onPitch = FXShared.hasOnPitchStats && FXShared.hasOnPitchStats(state.rawStatsCache.get(p.name));
+          return [onPitch ? 'Playing now — no scoring stats yet' : 'Game in progress — on the bench so far'];
+        }
+        return [`${gwPts || '0'} pts — no scoring stats this gameweek`];
       }
       const rawStats = state.rawStatsCache.get(p.name);
-      const lines = [`${p.fptsText} pts:`];
+      const lines = [`${gwPts} pts:`];
       entry.lines.forEach((l) => {
         const raw = rawStats && rawStats.get(l.abbr);
         if (raw !== undefined) {
@@ -190,10 +206,18 @@
     // itself carries that explanation on mobile too, ahead of the
     // projection line below.
     const statusLine = p.eventStatus ? [FXP.EVENT_STATUS_LABEL[p.eventStatus]] : [];
-    const proj = state.projectedCache.get(p.name);
-    if (proj === undefined) return [...statusLine, 'Projected points not available yet'];
-    const gw = FXP.getGameweekNumber();
-    return [...statusLine, `Projected: ${proj} pts${gw ? ` (Gameweek ${gw})` : ''}`];
+    // Season average (the roster table's own FP/G column, via
+    // points-sync.js's averageCache) -- shown for any not-yet-played
+    // player. Unlike the card's preview number (render.js, future
+    // gameweeks only), the tooltip line carries its own label, so it can't
+    // be mistaken for an earned score and stays useful on the active week
+    // too. Replaced the old "Projected: X pts" line -- projections are no
+    // longer shown anywhere (user request 2026-08-28).
+    const avg = state.averageCache.get(p.name);
+    if (avg === undefined || avg === null || avg === '-') {
+      return [...statusLine, 'Season average not synced yet'];
+    }
+    return [...statusLine, `Season average: ${avg} pts/game`];
   }
 
   FXP.ensureCardTip = ensureCardTip;

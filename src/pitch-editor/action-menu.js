@@ -9,7 +9,7 @@
  * News/Watch List/Compare/Notes, all of Fantrax's own UI) open exactly as
  * they would from the real list, so none of that needs reimplementing here.
  *
- * Touch devices have no hover, so the points-breakdown/projection tooltip
+ * Touch devices have no hover, so the points-breakdown/season-average tooltip
  * (tooltip.js's FXP.buildTooltipLines) is otherwise unreachable there. On a
  * coarse-pointer device (checked at open time), this menu prepends a
  * read-only stats section above the action buttons with exactly those

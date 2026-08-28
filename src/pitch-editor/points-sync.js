@@ -1,20 +1,33 @@
 /**
- * Prettier Fantrax -- Pitch Editor: background scrape for points breakdown + projections
+ * Prettier Fantrax -- Pitch Editor: background scrape for points breakdown + season average
  * ---------------------------------------------------------------------
- * Fantrax's own roster table can show either raw stat counts, each stat's
- * Fantasy Points contribution, or a points *projection* -- but only one at
- * a time, chosen via the "Stats/Fantasy Points/..." tabs and the
- * "Stats: <period>" dropdown above the list. There's no API for this, so --
- * same approach as content.js's Stats/Fpts toggle on the live-scoring page
- * -- this briefly flips those real controls to snapshot the data, then
- * flips them back to whatever the user had. The pitch/bench view itself
- * doesn't move (the real list is hidden underneath it).
+ * Fantrax's own roster table can show either raw stat counts or each
+ * stat's Fantasy Points contribution -- but only one at a time, chosen via
+ * the "Stats/Fantasy Points/..." tabs and the "Stats: <period>" dropdown
+ * above the list. There's no API for this, so -- same approach as
+ * content.js's Stats/Fpts toggle on the live-scoring page -- this briefly
+ * flips those real controls to snapshot the data, then flips them back to
+ * whatever the user had. The pitch/bench view itself doesn't move (the
+ * real list is hidden underneath it).
  *
  * Each run visits the Fantasy Points tab (per-stat points contributions,
  * `breakdownCache`) *and* the Stats tab (the same rows' raw counting
  * stats, `rawStatsCache`) so the hover tooltip can show both together, e.g.
  * "4 Saves (+2 pts)". The Stats tab is visited last and the original tab
  * is restored from there.
+ *
+ * The Stats-tab pass also reads each player's SEASON AVERAGE
+ * (`averageCache`) from the table's own FP/G column -- confirmed live
+ * (2026-08-28): with the period dropdown on its DEFAULT "<season> - YTD"
+ * option, the roster table's headers are [..., "FPts", "FP/G", "GP", ...],
+ * and FP/G is exactly Fantrax's own fantasy-points-per-game for the
+ * season. render.js shows it as a not-yet-played player's preview number
+ * on FUTURE gameweeks (see src/shared/gameweek.js). Since YTD is the
+ * default, this usually costs nothing extra; only when the user has
+ * switched the period dropdown elsewhere does the sync briefly flip it to
+ * the YTD option (matched by its confirmed "2026-27 - YTD" shape, tolerant
+ * of the season changing) and back. This replaced an earlier flip to the
+ * "Projected - Per Game" option: projections are no longer shown anywhere.
  *
  * The "Stats" period dropdown opens as a `mat-select` overlay -- on mobile
  * that overlay renders as a huge sheet, and the tab bar is a scrolling
@@ -138,12 +151,30 @@
     return m ? m[1] : null;
   }
 
-  async function chooseSelectOption(select, optionText) {
+  // `matcher` is either the option's exact text or a predicate
+  // (text) => boolean -- the predicate form lets the YTD option be matched
+  // by its confirmed SHAPE ("2026-27 - YTD") without pinning the season.
+  async function chooseSelectOption(select, matcher) {
     select.click();
     await delay(300);
-    const option = qa('mat-option').find((o) => o.textContent.trim() === optionText);
+    const matches = typeof matcher === 'function' ? matcher : (text) => text === matcher;
+    const option = qa('mat-option').find((o) => matches(o.textContent.trim()));
     if (!option) {
-      document.body.click(); // best-effort: close whatever opened
+      // The overlay MUST actually close here: syncPointsData's later
+      // `overlayChildCount() > 0` guards otherwise read a lingering
+      // dropdown as "a menu the user opened" and discard the whole run --
+      // breakdown included (this exact cascade was a real, user-visible
+      // bug: "stuck at loading points breakdown"). A bare body.click()
+      // doesn't reliably register as an outside-click to the CDK overlay,
+      // so close with Escape (CDK's own close key) and verify, falling
+      // back to a direct backdrop click.
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+      await delay(150);
+      if (overlayChildCount() > 0) {
+        const backdrop = document.querySelector('.cdk-overlay-backdrop');
+        if (backdrop) backdrop.click();
+        await delay(150);
+      }
       return false;
     }
     option.click();
@@ -174,6 +205,30 @@
       });
     });
     return out;
+  }
+
+  // A failed/aborted sync attempt must not depend on a FUTURE DOM mutation
+  // to retry: render() (this module's only caller) runs off main.js's
+  // MutationObserver, and after an SPA navigation the page can go
+  // completely quiet BEFORE the backoff window ends -- confirmed live
+  // (2026-08-28): navigating matchups -> roster fired an early render
+  // while the tab strip wasn't laid out yet, the "page isn't laid out"
+  // guard marked the gameweek attempted and started the backoff, the
+  // page's settling mutations all landed inside that window, and then
+  // nothing ever mutated again -- leaving the pitch stuck with empty
+  // caches ("Loading points breakdown…" forever) until a manual refresh.
+  // So every non-committing exit schedules its own timer retry. One timer
+  // max; the roster-page check keeps a stray early attempt on some other
+  // page (both this and the livescoring page carry a "Gameweek" select)
+  // from turning into an endless reschedule loop there.
+  let retryTimer = null;
+  function scheduleRetry() {
+    if (retryTimer) return;
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (!FXP.findLineupSystemNav || !FXP.findLineupSystemNav()) return; // roster page only
+      maybeSyncPointsData();
+    }, POINTS_SYNC_RETRY_MS + 500);
   }
 
   function maybeSyncPointsData() {
@@ -210,6 +265,7 @@
       // is gone (submitted or discarded) -- nothing else has to notice.
       state.pointsLastAttemptAt = Date.now();
       state.pointsSyncAttemptedGwKey = earlyGwKey;
+      scheduleRetry();
       return;
     }
     const tabs = findStatsTabs();
@@ -217,11 +273,13 @@
     if (!tabs || !periodSelect) {
       state.pointsLastAttemptAt = Date.now(); // page isn't laid out as expected -- skip silently, but don't retry every render
       state.pointsSyncAttemptedGwKey = earlyGwKey;
+      scheduleRetry();
       return;
     }
     if (overlayChildCount() > 0) {
       state.pointsLastAttemptAt = Date.now(); // don't fight an already-open menu
       state.pointsSyncAttemptedGwKey = earlyGwKey;
+      scheduleRetry();
       return;
     }
 
@@ -235,6 +293,26 @@
     let committed = false;
 
     try {
+      // Period FIRST: every column read below (the Fantasy Points tab's
+      // per-stat contributions, the Stats tab's raw counts, and the FPts
+      // column itself) follows the "Stats: <period>" dropdown -- and its
+      // default, "<season> - YTD", shows SEASON TOTALS, not the viewed
+      // gameweek. Confirmed live (2026-08-28, gameweek 2): under YTD a
+      // player's FPts cell held their gameweek-1 score, which is exactly
+      // the reported bug -- a live-game player's card showing "his scores
+      // from the previous gameweek", and a benched-in-real-life player
+      // showing points he hadn't earned this week. The dropdown's
+      // "<season> - Game Week" option scopes the table to whatever the
+      // Gameweek select shows -- verified live: under it, mid-game, a
+      // playing player's FPts read his real live 2.5 while the benched
+      // Munoz read 0. Matched by shape, season-agnostic. If the flip
+      // fails, everything degrades to the old behavior (reads under the
+      // user's own period) rather than aborting.
+      const isGwPeriodText = (text) => /^\d{4}([-/]\d{2,4})?\s*-\s*Game Week$/.test(text);
+      let onGwPeriod = isGwPeriodText(periodSelect.textContent.trim());
+      if (!onGwPeriod) onGwPeriod = await chooseSelectOption(periodSelect, isGwPeriodText);
+      if (overlayChildCount() > 0) return;
+
       if (originalTabBtn !== tabs.fpts) {
         tabs.fpts.click();
         await delay(500);
@@ -252,14 +330,6 @@
         breakdown.set(name, { lines });
       });
 
-      let projected = state.projectedCache;
-      const opened = await chooseSelectOption(periodSelect, FXP.PROJECTED_OPTION_TEXT);
-      if (opened) {
-        projected = new Map();
-        readAllRows().forEach(({ name, cells }) => projected.set(name, cells[3]));
-        await chooseSelectOption(periodSelect, originalPeriodText);
-      }
-
       // Stats tab: the same rows' raw counting stats. A stat can be worth 0
       // points yet still have a meaningful raw count (e.g. 0-value saves),
       // so keep every non-empty cell here rather than the breakdown loop's
@@ -268,8 +338,9 @@
       await delay(500);
       if (overlayChildCount() > 0) return;
 
+      const statRows = readAllRows();
       const raw = new Map();
-      readAllRows().forEach(({ name, headers, cells }) => {
+      statRows.forEach(({ name, headers, cells }) => {
         const statMap = new Map();
         for (let i = 5; i < headers.length && i < cells.length; i++) {
           const text = cells[i];
@@ -278,6 +349,52 @@
         }
         raw.set(name, statMap);
       });
+
+      // Per-gameweek points: the FPts column of these same rows, valid
+      // precisely because the period is scoped to the viewed gameweek (see
+      // the period-first comment above). This is what a locked player's
+      // card/tooltip shows -- live earned points during a game, the real
+      // final score afterwards, and a genuine 0 for a player who was
+      // benched in real life. Only committed when the gameweek flip
+      // actually took; otherwise the previous cache is kept.
+      let gwPoints = state.gwPointsCache;
+      if (onGwPeriod) {
+        gwPoints = new Map();
+        statRows.forEach(({ name, headers, cells }) => {
+          const i = headers.indexOf('FPts');
+          if (i !== -1 && cells[i] !== undefined) gwPoints.set(name, cells[i]);
+        });
+      }
+
+      // Season average: the FP/G column -- but only under a YTD period is
+      // FP/G the SEASON per-game figure (on any other period it's that
+      // period's own average). We're normally sitting on the gameweek
+      // period at this point, so this is usually one more flip; matched by
+      // the confirmed "2026-27 - YTD" option shape, season-agnostic. If
+      // the option isn't found the run keeps the previous averageCache --
+      // the caches above are already read and unaffected.
+      const isYtdText = (text) => /-\s*YTD$/.test(text);
+      const readAverages = (rows) => {
+        const map = new Map();
+        rows.forEach(({ name, headers, cells }) => {
+          const i = headers.indexOf('FP/G');
+          if (i !== -1 && cells[i] !== undefined) map.set(name, cells[i]);
+        });
+        return map;
+      };
+      let average = state.averageCache;
+      if (isYtdText(periodSelect.textContent.trim())) {
+        average = readAverages(statRows);
+      } else if (await chooseSelectOption(periodSelect, (t) => /^\d{4}([-/]\d{2,4})?\s*-\s*YTD$/.test(t))) {
+        average = readAverages(readAllRows());
+      }
+
+      // Restore the user's own period whenever this run left it anywhere
+      // else (on the YTD read above, or on the gameweek option when the
+      // YTD flip failed).
+      if (periodSelect.textContent.trim() !== originalPeriodText) {
+        await chooseSelectOption(periodSelect, originalPeriodText);
+      }
 
       // We always end this run on the Stats tab (above), so restore
       // whatever the user actually had selected, whenever that differs.
@@ -308,7 +425,8 @@
       if (!gwChangedMidSync && !emptyScrape) {
         state.breakdownCache = breakdown;
         state.rawStatsCache = raw;
-        state.projectedCache = projected;
+        state.averageCache = average;
+        state.gwPointsCache = gwPoints;
         state.pointsCacheAt = Date.now();
         state.pointsCacheGwKey = gwKey;
         committed = true;
@@ -317,7 +435,10 @@
     } catch (err) {
       // best-effort background sync -- leave the previous cache in place
     } finally {
-      if (!committed) state.pointsLastAttemptAt = Date.now(); // didn't finish -- back off before the next attempt
+      if (!committed) {
+        state.pointsLastAttemptAt = Date.now(); // didn't finish -- back off before the next attempt
+        scheduleRetry();
+      }
       document.documentElement.classList.remove('fx-syncing');
       state.pointsSyncInFlight = false;
       state.busy = false;
@@ -331,7 +452,7 @@
       // because the FXP.render() call below relies on them already being
       // false.
       state.pointsSyncAttemptedGwKey = gwKey;
-      // Pitch cards for a not-yet-played player show state.projectedCache
+      // Pitch cards for a not-yet-played player show state.averageCache
       // (see render.js's renderCard), and the loading overlay above only
       // clears once render() actually runs again -- but nothing else
       // re-renders the pitch on its own (only an unrelated DOM mutation

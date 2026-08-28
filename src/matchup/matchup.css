@@ -1229,12 +1229,16 @@ body:not(.theme--dark) .fxm-bench .fxm-card__pts--zero {
   color: var(--fx-draw-fg);
 }
 
-/* ---------- recent performances, inside the hover tooltip ----------
-   Desktop's equivalent of the action menu's own block (see
+/* ---------- recent performances + season average, inside the hover tooltip ----------
+   Desktop's equivalents of the action menu's own blocks (see
    action-menu.css) -- same information, in the place a desktop user asks
    for it. Mirrors pitch-editor/tooltip.css's `.fx-card-tip__recent`
-   rules under this feature's own prefix. */
-.fxm-tip__recent {
+   rules under this feature's own prefix. `.fxm-tip__avg` (the season
+   average, render.js's appendAverageSection) shares the exact same box
+   treatment -- its own class exists only so the async resolve callback
+   can re-locate precisely its own section. */
+.fxm-tip__recent,
+.fxm-tip__avg {
   margin-top: 6px;
   padding-top: 5px;
   border-top: 1px solid var(--fx-border);

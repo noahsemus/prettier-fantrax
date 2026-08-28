@@ -1,9 +1,17 @@
 /**
- * Prettier Fantrax -- Matchup Pitch: recent-performances FPts (same-origin fetch)
+ * Prettier Fantrax -- shared: per-player game log (recent performances + season average)
  * ---------------------------------------------------------------------
- * Feeds action-menu.js's "Recent performances" block -- see fxpa.js's
- * header comment for why this needs a same-origin fetch at all (this data
- * is nowhere in the matchup page's own DOM).
+ * Feeds the "Recent performances" blocks and, via getSeasonAverage/
+ * peekSeasonAverage, the matchup pitch's future-gameweek preview number --
+ * see fxpa.js's header comment for why this needs a same-origin fetch at
+ * all (this data is nowhere in the matchup page's own DOM). Both are just
+ * different views over ONE cached per-player game log (getGameLog below),
+ * so looking up a player's recent form AND their average costs a single
+ * request. NOTE the average is the mean of the rows Fantrax's own "Recent
+ * Games" profile table returns -- exact early in the season; if Fantrax
+ * caps that table later in the season it becomes a recent-games average.
+ * (The ROSTER pitch doesn't use this average: the roster table's own FP/G
+ * column is the exact season figure there -- see pitch-editor/points-sync.)
  *
  * Two-step lookup, both confirmed live against the real endpoint:
  *   1. Fantrax's own real "recent games" log is served per-player by
@@ -72,12 +80,16 @@ window.FXShared = window.FXShared || {};
   // in-app navigation -- resets all of this, as any module state would.
   // Semantics
   // are unchanged from when these lived on FXM.state: PRESENCE in
-  // last5Cache means resolved (an empty array is a valid cached "no games
-  // on record"), failures are never cached so the next tap retries, and
-  // last5Inflight holds at most one live fetch per key.
+  // gameLogCache means resolved (an empty array is a valid cached "no
+  // games on record"), failures are never cached so the next tap retries,
+  // and gameLogInflight holds at most one live fetch per key.
   const state = {
-    last5Cache: new Map(),
-    last5Inflight: new Map(),
+    // Full per-player game log (every row Fantrax's "Recent Games" table
+    // returns), keyed `teamId|name` (see cacheKey). getLast5 and
+    // getSeasonAverage are both derived views over this one cache, so one
+    // request per player serves both.
+    gameLogCache: new Map(),
+    gameLogInflight: new Map(),
     scorerIdMap: null,
     scorerIdMapPromise: null,
   };
@@ -263,8 +275,8 @@ window.FXShared = window.FXShared || {};
   }
 
   // ---------- public: getLast5(name, teamId) -> Promise<Array<{date,fpts,opponent}>> ----------
-  // Cached per (player, team) for the session -- state.last5Cache/
-  // last5Inflight, composite-keyed so the rare case of two same-named
+  // Cached per (player, team) for the session -- state.gameLogCache/
+  // gameLogInflight, composite-keyed so the rare case of two same-named
   // players on opposite sides of the SAME matchup can never share a cache
   // entry. One in-flight fetch per key max -- see state.js's own comment
   // on both maps for exactly what "cached"/"in-flight" mean here and why
@@ -336,10 +348,12 @@ window.FXShared = window.FXShared || {};
     return run;
   }
 
-  function getLast5(name, teamId) {
+  // The one actual fetch -- resolves to the player's full game log (every
+  // row Fantrax's "Recent Games" table returns), or `null` on failure.
+  function getGameLog(name, teamId) {
     const key = cacheKey(name, teamId);
-    if (state.last5Cache.has(key)) return Promise.resolve(state.last5Cache.get(key));
-    if (state.last5Inflight.has(key)) return state.last5Inflight.get(key);
+    if (state.gameLogCache.has(key)) return Promise.resolve(state.gameLogCache.get(key));
+    if (state.gameLogInflight.has(key)) return state.gameLogInflight.get(key);
 
     const promise = ensureScorerIdMap()
       .then((map) => {
@@ -351,31 +365,56 @@ window.FXShared = window.FXShared || {};
         return queueProfileRequest(scorerId).then(extractRecentGames);
       })
       .then((rows) => {
-        const last5 = rows.slice(0, 5);
-        state.last5Cache.set(key, last5);
-        state.last5Inflight.delete(key);
-        return last5;
+        state.gameLogCache.set(key, rows);
+        state.gameLogInflight.delete(key);
+        return rows;
       })
       .catch((err) => {
-        console.warn('[fx-last5] failed to fetch recent performances for', name, err);
-        state.last5Inflight.delete(key);
+        console.warn('[fx-last5] failed to fetch game log for', name, err);
+        state.gameLogInflight.delete(key);
         return null; // caller treats null as "couldn't load" -- section just doesn't appear
       });
 
-    state.last5Inflight.set(key, promise);
+    state.gameLogInflight.set(key, promise);
     return promise;
   }
 
+  function getLast5(name, teamId) {
+    return getGameLog(name, teamId).then((rows) => (rows ? rows.slice(0, 5) : rows));
+  }
   FX.getLast5 = getLast5;
-  // Synchronous cache peek: returns cached rows (possibly an empty array),
-  // or `undefined` when this player has never been fetched. Both features'
-  // action menus use it to choose between rendering immediately and
-  // showing a "loading…" placeholder; they previously reached into
+  // Synchronous cache peek: returns the last-5 slice (possibly an empty
+  // array), or `undefined` when this player has never been fetched. Both
+  // features' action menus use it to choose between rendering immediately
+  // and showing a "loading…" placeholder; they previously reached into
   // FXM.state.last5Cache directly, which a shared module can't offer.
   function peekLast5(name, teamId) {
-    return state.last5Cache.get(cacheKey(name, teamId));
+    const rows = state.gameLogCache.get(cacheKey(name, teamId));
+    return rows === undefined ? undefined : rows && rows.slice(0, 5);
   }
   FX.peekLast5 = peekLast5;
+
+  // Mean FPts across the fetched game log -- the matchup pitch's
+  // future-gameweek preview number (see this file's header for the
+  // "Recent Games" caveat, and gameweek.js for the only-on-future-weeks
+  // gating callers apply). `null` = failed fetch OR no numeric rows;
+  // callers show nothing/0 for both.
+  function averageFpts(rows) {
+    if (!rows) return null;
+    const values = rows.map((g) => parseFloat(g.fpts)).filter((n) => !Number.isNaN(n));
+    if (!values.length) return null;
+    return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100;
+  }
+
+  function getSeasonAverage(name, teamId) {
+    return getGameLog(name, teamId).then((rows) => averageFpts(rows));
+  }
+  FX.getSeasonAverage = getSeasonAverage;
+  function peekSeasonAverage(name, teamId) {
+    const rows = state.gameLogCache.get(cacheKey(name, teamId));
+    return rows === undefined ? undefined : averageFpts(rows);
+  }
+  FX.peekSeasonAverage = peekSeasonAverage;
   // Exported so action-menu.js's buildLast5Section can check
   // state.last5Cache synchronously with the EXACT same key format this
   // file uses internally, rather than re-deriving (and risking drift from)

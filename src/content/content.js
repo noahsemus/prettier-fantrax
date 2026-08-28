@@ -391,6 +391,21 @@
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
+  // Interval safety net alongside the debounce: during a LIVE game this
+  // page can mutate more often than the debounce window basically forever
+  // -- Fantrax's own live ticking, plus the matchup pitch rebuilding its
+  // whole DOM in response (each rebuild is itself a mutation burst) --
+  // which STARVES a pure debounce: the page-load capture becomes the only
+  // one that ever runs, and window.FXC silently freezes (the reported
+  // symptom: stats earned during live play never gain their hybrid
+  // raw+fpts tooltip line until a manual reload). The interval guarantees
+  // a capture attempt at least once per throttle window no matter how
+  // busy the page is; snapshotCounterpart's own needsCapture gate keeps
+  // it from ever capturing more often than THROTTLE_MS.
+  setInterval(() => {
+    if (!state.isToggling) snapshotCounterpart();
+  }, THROTTLE_MS);
+
   // Initial run.
   snapshotCounterpart();
 })();

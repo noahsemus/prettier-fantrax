@@ -102,6 +102,17 @@ window.FXM = window.FXM || {};
     // ("S. Lammens") name match against scorerMap's own full names.
     homeTeamId: null,
     awayTeamId: null,
+
+    // Whether the DISPLAYED gameweek is in the future (see
+    // src/shared/gameweek.js) -- refreshed every render(); gates
+    // renderCard's season-average preview number.
+    isFutureGameweek: false,
+    // last5.js cache keys with a season-average fetch outstanding, so
+    // renderCard attaches its patch-on-resolve callback at most ONCE per
+    // player -- not once per re-render (this page re-renders constantly on
+    // live updates; unbounded callback re-attachment cascaded into a
+    // tab-freezing render storm in a previous attempt).
+    averageFetchPending: new Set(),
   };
 
   FXM.qa = function qa(sel, root) {
