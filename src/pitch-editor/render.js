@@ -236,6 +236,11 @@
       if (!rowPlayers.length) return;
       const row = document.createElement('div');
       row.className = 'fx-pitch__row';
+      // Visible-card count as a CSS var -- pitch.css's narrow block
+      // computes the row's gap from it (elastic between a minimum and the
+      // regular spacing, compressing before the row ever pans). Empty
+      // slots are display:none outside a swap, so they don't count.
+      row.style.setProperty('--fx-cards', String(rowPlayers.filter((p) => !p.isEmpty).length));
       rowPlayers.forEach((p) => row.appendChild(renderCard(p, jerseyMap)));
       field.appendChild(row);
       // Rows pan horizontally when they can't fit (pitch.css) -- this

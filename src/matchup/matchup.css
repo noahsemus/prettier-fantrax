@@ -1145,15 +1145,24 @@
   }
 
   .fxm-line {
-    /* 16px, not the 6px this used to be: the roster's cards carry 4px of
-       transparent padding + a 1px border around their info plate, so its
-       6px flex gap reads as ~16px of green between plates -- matchup
-       cards have no such padding, so matching the VISIBLE spacing means
-       matching that 16px here (user request: same spacing as roster).
-       A 5-wide line is now 5 * 58 + 4 * 16 = 354px and can overflow a
-       very narrow viewport -- which is fine and matches roster exactly:
-       that's what the horizontal panning + edge arrows are for. */
-    gap: 16px;
+    /* ELASTIC gap, 6px..16px: 16px matches the roster pitch's visible
+       plate-to-plate spacing (its cards carry 4px transparent padding +
+       a 1px border that these don't), but a fixed 16px made a 5-wide
+       line pan on phones that fit it comfortably at 6px (reported on a
+       Pixel 9, where the roster row fit and the matchup row scrolled).
+       So the gap computes from the line's own free space -- (line width
+       - cards * 58px card) / (cards - 1), with the card count published
+       per line as --fxm-cards by render.js's renderLine -- and clamps
+       between the two: roster-wide whenever it fits, compressed toward
+       6px when tight, and only past THAT does the line pan with the
+       edge arrows. The plain 6px line above it is the fallback for any
+       engine that can't divide by a var() in calc(). */
+    gap: 6px;
+    gap: clamp(
+      6px,
+      calc((100% - (var(--fxm-cards, 5) * 58px)) / max(1, var(--fxm-cards, 5) - 1)),
+      16px
+    );
     /* If a shrunken 5-wide row STILL can't fit (very small widths), pan
        horizontally instead of clipping. `safe center` = centered while it
        fits, start-aligned once it overflows (plain centering + overflow

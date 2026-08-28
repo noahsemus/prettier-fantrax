@@ -213,7 +213,20 @@
    was verified with injected !important rules that masked the cascade. */
 @media (max-width: 760px) {
   .fx-pitch__row {
+    /* ELASTIC gap, 2px..6px (visible plate-to-plate ~12px..16px -- each
+       card adds 4px padding + 1px border of its own): regular spacing
+       whenever the row fits, compressing before the row ever pans. Card
+       boxes render 68px here (58px width + padding + border,
+       content-box); --fx-cards is the row's visible-card count,
+       published by render.js. The plain 6px is the fallback for any
+       engine that can't divide by a var() in calc(). Same elastic
+       treatment as matchup's .fxm-line. */
     gap: 6px;
+    gap: clamp(
+      2px,
+      calc((100% - (var(--fx-cards, 5) * 68px)) / max(1, var(--fx-cards, 5) - 1)),
+      6px
+    );
     overflow-x: auto;
     justify-content: safe center;
     scrollbar-width: none;

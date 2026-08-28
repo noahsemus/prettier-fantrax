@@ -1092,6 +1092,11 @@
   function renderLine(players, pos, side) {
     const line = el('div', 'fxm-line');
     line.dataset.pos = pos;
+    // Card count as a CSS var: matchup.css's narrow block computes the
+    // line's gap from it -- as wide as the roster pitch's spacing when
+    // the line fits, compressing toward a minimum before the line ever
+    // resorts to panning (see the gap clamp there).
+    line.style.setProperty('--fxm-cards', String(players.length));
     players.forEach((p) => line.appendChild(renderCard(p, undefined, side)));
     // Lines pan horizontally when they can't fit (matchup.css's narrow
     // block) -- this maintains the fade-in edge arrows that say which way
