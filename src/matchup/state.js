@@ -107,6 +107,10 @@ window.FXM = window.FXM || {};
     // src/shared/gameweek.js) -- refreshed every render(); gates
     // renderCard's season-average preview number.
     isFutureGameweek: false,
+    // Serialized snapshot of everything the last render painted from --
+    // render() skips wholesale when it's unchanged (see its own comment
+    // for the iOS tap-eating storm this prevents).
+    lastRenderSignature: null,
     // last5.js cache keys with a season-average fetch outstanding, so
     // renderCard attaches its patch-on-resolve callback at most ONCE per
     // player -- not once per re-render (this page re-renders constantly on

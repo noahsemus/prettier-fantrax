@@ -4979,6 +4979,10 @@ window.FXM = window.FXM || {};
     // src/shared/gameweek.js) -- refreshed every render(); gates
     // renderCard's season-average preview number.
     isFutureGameweek: false,
+    // Serialized snapshot of everything the last render painted from --
+    // render() skips wholesale when it's unchanged (see its own comment
+    // for the iOS tap-eating storm this prevents).
+    lastRenderSignature: null,
     // last5.js cache keys with a season-average fetch outstanding, so
     // renderCard attaches its patch-on-resolve callback at most ONCE per
     // player -- not once per re-render (this page re-renders constantly on
@@ -6485,6 +6489,30 @@ window.FXM = window.FXM || {};
 
     const container = ensureContainer();
     if (!container) return;
+
+    // ---------- skip identical re-renders entirely ----------
+    // This function used to tear down and rebuild the ENTIRE pitch on
+    // every page mutation -- and during live games this page mutates
+    // constantly (score/clock ticks), plus content.js's 30s capture adds
+    // periodic churn even when quiet. On iOS that was catastrophic for a
+    // reason far beyond wasted work: WebKit synthesizes a tap's `click`
+    // after touchend and DROPS it when the layout shifts under the finger
+    // mid-gesture -- so during live play, most taps on Fantrax's own
+    // bottom nav died against our rebuild storm, and users couldn't leave
+    // the matchup screen without mashing until a tap landed in a quiet
+    // window (reported live; Chromium's synthesis is tolerant, which is
+    // why Android and desktop never showed it). Everything this render
+    // paints derives from `data` + window.FXC + the future-gameweek flag
+    // + the owner-name cache, so when THAT snapshot is unchanged, the DOM
+    // is left completely alone: taps land, marquees keep their cycle, an
+    // open action menu stays put. Maps serialize via the replacer (chips).
+    const fxc = window.FXC;
+    const renderSignature = JSON.stringify(
+      [data, fxc ? fxc.capturedAt : 0, !!(FXShared.isFutureGameweek && FXShared.isFutureGameweek()), Array.from(state.ownerCache.entries())],
+      (key, value) => (value instanceof Map ? Array.from(value.entries()) : value)
+    );
+    if (renderSignature === state.lastRenderSignature && state.bodyEl && state.bodyEl.isConnected) return;
+    state.lastRenderSignature = renderSignature;
 
     // Kick off (if needed) the manager-username lookup for both teams in
     // this matchup, before headers are built below -- see
