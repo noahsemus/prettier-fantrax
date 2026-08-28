@@ -21,8 +21,13 @@
   text-align: center;
   font-size: 12px;
   font-weight: 700;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.45);
+  /* White chip with a dark chevron -- a translucent dark chip disappeared
+     into the pitch's dark card plates; white stands out against both the
+     green field and the cards, in either theme (the pitch is green in
+     both). The drop shadow separates it from any white jersey behind it. */
+  color: #1c2a22;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   border-radius: 50%;
   pointer-events: none;
   opacity: 0;
