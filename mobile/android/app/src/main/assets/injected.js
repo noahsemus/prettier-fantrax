@@ -3538,21 +3538,57 @@ window.FXP = window.FXP || {};
   // max; the roster-page check keeps a stray early attempt on some other
   // page (both this and the livescoring page carry a "Gameweek" select)
   // from turning into an endless reschedule loop there.
+  //
+  // The retry cadence is ADAPTIVE (user report, 2026-08-28: points took
+  // ~15s to appear after switching matchup -> roster, or never appeared
+  // at all until an app restart). While the viewed gameweek has NOTHING
+  // committed -- the user is staring at zeros/"Loading points breakdown"
+  // -- a flat 15s wait is unjustifiable when the usual failure is just
+  // "the page hadn't laid out its tab strip yet", which resolves within
+  // a second or two. Retries escalate 1.5s -> 3s -> 6s -> 12s -> 15s cap
+  // (reset on every successful commit), and the render-path backoff below
+  // uses the same short leash in that state. Once a commit EXISTS for the
+  // current gameweek, everything reverts to the polite 15s/60s cadence.
+  //
+  // The "never appeared until restart" half of the report was this same
+  // timer dying silently: it fires while the user has navigated AWAY from
+  // the roster (its roster-page check returns without rescheduling), and
+  // when they navigate back, the settling mutations all land inside the
+  // old 15s backoff -- quiet page, no retry, dead pitch. The short
+  // nothing-committed backoff closes that hole too: the return
+  // navigation's own renders are allowed to kick a sync within 1.5s.
+  const QUICK_RETRY_MS = 1500;
+  let quickRetryCount = 0; // consecutive non-commits while nothing is committed; reset on commit
+
+  function currentRetryDelay() {
+    const uncommitted = getGameweekNumber() !== state.pointsCacheGwKey;
+    if (!uncommitted) return POINTS_SYNC_RETRY_MS;
+    return Math.min(QUICK_RETRY_MS * Math.pow(2, quickRetryCount), POINTS_SYNC_RETRY_MS);
+  }
+
   let retryTimer = null;
   function scheduleRetry() {
     if (retryTimer) return;
+    quickRetryCount += 1;
     retryTimer = setTimeout(() => {
       retryTimer = null;
       if (!FXP.findLineupSystemNav || !FXP.findLineupSystemNav()) return; // roster page only
       maybeSyncPointsData();
-    }, POINTS_SYNC_RETRY_MS + 500);
+    }, currentRetryDelay() + 500);
   }
 
   function maybeSyncPointsData() {
     if (state.pointsSyncInFlight) return;
-    if (Date.now() - (state.pointsLastAttemptAt || 0) < POINTS_SYNC_RETRY_MS) return; // just tried and failed/aborted -- back off
-
     const gwKey = getGameweekNumber();
+    // Back off after a failed/aborted attempt -- but on a SHORT leash
+    // while this gameweek has nothing committed (see the adaptive-retry
+    // comment above): there the user is looking at an empty/zeroed pitch,
+    // and the common failure is transient page layout, not a broken page.
+    const backoff = gwKey !== state.pointsCacheGwKey
+      ? Math.min(QUICK_RETRY_MS * Math.pow(2, Math.max(0, quickRetryCount - 1)), POINTS_SYNC_RETRY_MS)
+      : POINTS_SYNC_RETRY_MS;
+    if (Date.now() - (state.pointsLastAttemptAt || 0) < backoff) return;
+
     if (gwKey !== state.pointsCacheGwKey) {
       syncPointsData(); // new gameweek (or first load ever) -- always resync
       return;
@@ -3747,6 +3783,7 @@ window.FXP = window.FXP || {};
         state.pointsCacheAt = Date.now();
         state.pointsCacheGwKey = gwKey;
         committed = true;
+        quickRetryCount = 0; // fresh escalation ladder for the next gameweek switch / navigation
         FXP.refreshOpenTooltip();
       }
     } catch (err) {
