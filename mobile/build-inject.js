@@ -9,6 +9,11 @@
  * end. The result is copied into both native asset locations. Run with
  * `node build-inject.js` from the mobile/ directory (paths are resolved
  * relative to this file, so cwd doesn't matter).
+ *
+ * The manifest-reading/concatenation helpers are also exported for
+ * build-userscript.js at the repo root, which builds the same bundle in
+ * userscript form -- so requiring this file must not run the build
+ * (see the require.main guard at the bottom).
  * ---------------------------------------------------------------------
  */
 'use strict';
@@ -126,4 +131,6 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { REPO_ROOT, MANIFEST_PATH, collectPaths, readRepoFile, buildCssInjectionScript };

@@ -55,14 +55,54 @@ To update later: download the new release ZIP, replace the folder's
 contents, and click the refresh icon on the extension's card in
 `chrome://extensions`.
 
-### On an iPhone (free -- no Apple Developer account)
+### On an iPhone (free -- no computer needed)
 
-Apple doesn't let iPhones install apps from a link unless the developer
-pays for a $99/yr Apple Developer account. Without one, the only way is
-to build the app yourself and "sideload" it with a cable. It's genuinely
-free, but two catches: **you need a Mac with Xcode**, and **the app
-expires after 7 days** -- plugging the phone back in and pressing Run
-again re-signs it for another 7 days.
+Apple doesn't let Safari install browser extensions freely -- publishing
+one requires a $99/yr Apple Developer account. But iOS Safari *can* run
+this as a **userscript**, via the free, open-source
+[Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887)
+app on the App Store. Same features, real Safari, your existing
+fantrax.com login, no expiry, and updates arrive on their own. This is
+the easiest phone install of any platform -- and it's the "here's a
+link" option for friends: they just follow these same steps.
+
+1. Install **Userscripts** from the App Store (free), and open it once
+   so it sets up its scripts folder (the default is fine).
+2. Turn the extension on: **Settings → Apps → Safari → Extensions →
+   Userscripts** (older iOS: **Settings → Safari → Extensions**).
+   While you're there, allow it for **fantrax.com**.
+3. In Safari, open the script:
+   [prettier-fantrax.user.js](https://raw.githubusercontent.com/noahsemus/prettier-fantrax/main/prettier-fantrax.user.js)
+4. Tap the **extensions (puzzle-piece) button** in the address bar (on
+   older iOS it's inside the **aA** menu), tap **Userscripts**, and tap
+   **install** on the prompt it shows.
+5. Open (or refresh) fantrax.com in Safari. That's it -- tap a player
+   for the stat tooltip, tap-and-hold then drag to swap.
+
+Updates are automatic: the script periodically checks its own source
+URL (that's the `@updateURL` in step 3's file), so a new release just
+shows up. The one difference from the Chrome extension: the
+starter-not-starting warning appears as the on-pitch banner only, with
+no system notification -- userscripts can't post those.
+
+The same userscript also works in **Safari on a Mac** (same app, same
+steps) and in any browser with a userscript manager (Tampermonkey,
+Violentmonkey), if you'd rather not load the unpacked extension.
+
+(Tinkerers: the [Orion browser](https://orionbrowser.com/) for iOS can
+install actual Chrome extensions, but its extension support is still
+beta -- the Userscripts route above is the dependable one.)
+
+### The iPhone companion app (needs a Mac; expires weekly)
+
+`mobile/` also wraps this into a real installable app -- worth it only
+if you want a dedicated icon on the home screen instead of using
+Safari. Apple doesn't let iPhones install apps from a link unless the
+developer pays for the $99/yr account, so without one the only way is
+to build the app yourself and "sideload" it with a cable. It's
+genuinely free, but two catches: **you need a Mac with Xcode**, and
+**the app expires after 7 days** -- plugging the phone back in and
+pressing Run again re-signs it for another 7 days.
 
 What you need: a Mac, a free Apple ID, your iPhone + a USB cable.
 
@@ -103,13 +143,14 @@ When it expires (7 days): plug the phone back into the Mac and press
 **▶ Run** in Xcode again. Your login inside the app survives. (Free
 Apple IDs are also limited to 3 sideloaded apps on a phone at a time.)
 
-**Giving this to iPhone-owning friends:** there is unfortunately no
-"here's a link" option without the paid account. Each friend's phone has
-to go through steps 6-9 while plugged into a Mac -- yours works fine
-(your one Apple ID can sign for their device too), but the 7-day expiry
-means they'd need to come back weekly. For anything less hands-on,
-TestFlight (which *is* a tap-a-link install) requires the $99/yr
-account. Friends on Android are much easier -- see below.
+**Giving the app to iPhone-owning friends:** there is unfortunately no
+"here's a link" option for the *app* without the paid account -- every
+tap-a-link route (TestFlight, Ad Hoc, the App Store itself) requires
+the $99/yr membership, and the free sideloading tools (AltStore,
+SideStore) still mean per-phone setup and the same 7-day expiry. So
+point friends at the [userscript
+install](#on-an-iphone-free----no-computer-needed) above instead --
+that one really is just a link.
 
 ### On an Android phone
 
@@ -357,6 +398,9 @@ src/
 background.js            extension service worker -- shows the desktop
                          notification for a lineup warning (content scripts
                          can't call chrome.notifications themselves)
+build-userscript.js      builds prettier-fantrax.user.js (committed): the same
+                         content-script bundle in userscript form, for iOS and
+                         macOS Safari via the free Userscripts app
 mobile/                  Capacitor app wrapping fantrax.com for iOS/Android
 ```
 
@@ -470,12 +514,13 @@ looked up once the page actually runs, not while the files are loading.
 
 ## Mobile app
 
-Chrome for Android/iOS doesn't support extensions, so there's no way to
-load this on a phone's browser directly. Instead, `mobile/` holds a
-small Capacitor-based app that wraps fantrax.com's mobile site in its
-own WebView and injects the same scripts into it. `src/` stays the one
-source of truth -- a build step bundles those files for the app rather
-than forking them.
+Phone browsers can't load this extension directly (on iOS, Safari runs
+it as a userscript instead -- see [How to
+install](#how-to-install)). For Android, or for an iPhone home-screen
+icon, `mobile/` holds a small Capacitor-based app that wraps
+fantrax.com's mobile site in its own WebView and injects the same
+scripts into it. `src/` stays the one source of truth -- a build step
+bundles those files for the app rather than forking them.
 
 **Important limitation:** this enhances the fantrax.com *website*
 running inside the app's own WebView, not the official Fantrax app --
