@@ -177,6 +177,12 @@
     if (!players.length) return;
 
     container.innerHTML = '';
+    // A rebuild mid-touch-gesture must tear the gesture down too -- the
+    // cards (and their touch listeners) are gone after the wipe above, so
+    // a lifted card's ghost would otherwise be stranded on document.body
+    // (see drag.js's safety-net comment for the tap-eating failure that
+    // caused on the app).
+    if (FXP.cancelTouchDrag) FXP.cancelTouchDrag();
     FXP.closeActionMenu();
     state.armed = null;
     state.dragSource = null;

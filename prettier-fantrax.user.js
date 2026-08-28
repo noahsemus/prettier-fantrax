@@ -2335,6 +2335,12 @@ window.FXP = window.FXP || {};
     if (!players.length) return;
 
     container.innerHTML = '';
+    // A rebuild mid-touch-gesture must tear the gesture down too -- the
+    // cards (and their touch listeners) are gone after the wipe above, so
+    // a lifted card's ghost would otherwise be stranded on document.body
+    // (see drag.js's safety-net comment for the tap-eating failure that
+    // caused on the app).
+    if (FXP.cancelTouchDrag) FXP.cancelTouchDrag();
     FXP.closeActionMenu();
     state.armed = null;
     state.dragSource = null;
@@ -2841,6 +2847,13 @@ window.FXP = window.FXP || {};
     const rect = card.getBoundingClientRect();
     const ghost = card.cloneNode(true);
     ghost.classList.add('fx-card--touch-ghost');
+    // The ghost follows the finger and must NEVER intercept taps: it's
+    // appended to document.body, so if a teardown is ever missed (see the
+    // document-level safety net below) a stuck ghost would otherwise sit
+    // there eating every tap under it -- including, reported on the app,
+    // the bottom nav's own buttons, which made navigating back to the
+    // roster impossible without a full reload.
+    ghost.style.pointerEvents = 'none';
     ghost.style.position = 'fixed';
     ghost.style.left = `${rect.left}px`;
     ghost.style.top = `${rect.top}px`;
@@ -2915,6 +2928,30 @@ window.FXP = window.FXP || {};
     if (!source || !target || !isValidDropTarget(source, target)) return;
     FXP.attemptSwap(source, target);
   }
+
+  // Safety net for the whole touch gesture: all the per-card touch
+  // listeners above die with their card, and render() rebuilds every card
+  // whenever a points-sync lands -- which the tap itself can now trigger
+  // (FXP.requestPointsSync). A card removed mid-gesture can mean its own
+  // touchend never runs, leaving touchActive/touchInProgress stuck and the
+  // body-level ghost parked on screen forever (it survives SPA navigation,
+  // and before the pointer-events fix above it swallowed every tap it
+  // covered -- the reported "can't tap back to Roster until I reload the
+  // app"). The document always sees the gesture end even when the card is
+  // gone, so clean up from here. Passive + capture: observation only,
+  // never interferes with anyone's tap handling.
+  ['touchend', 'touchcancel'].forEach((type) => {
+    document.addEventListener(
+      type,
+      (e) => {
+        if (e.touches && e.touches.length > 0) return; // fingers still down
+        if (touchActive) endTouchDrag();
+        touchInProgress = false;
+        clearTouchTimer();
+      },
+      { passive: true, capture: true }
+    );
+  });
 
   function wireCardInteractions(card, p) {
     const canDrag = !p.isEmpty && !p.locked;
@@ -3096,6 +3133,9 @@ window.FXP = window.FXP || {};
   FXP.isValidDropTarget = isValidDropTarget;
   FXP.highlightValidTargets = highlightValidTargets;
   FXP.clearTargetHighlights = clearTargetHighlights;
+  // render() calls this before wiping the pitch: a rebuild mid-gesture
+  // must never strand the ghost/highlight state (see the safety net above).
+  FXP.cancelTouchDrag = endTouchDrag;
   FXP.wireCardInteractions = wireCardInteractions;
   FXP.armCard = armCard;
   FXP.clearArmed = clearArmed;
