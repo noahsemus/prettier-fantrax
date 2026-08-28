@@ -56,12 +56,22 @@ automatic updates. This is also the link to give friends.
    default scripts folder is fine).
 2. Enable it under **Settings → Apps → Safari → Extensions →
    Userscripts** (older iOS: **Settings → Safari → Extensions**), and
-   allow it for **fantrax.com**.
+   set **Allow** to **All Websites** -- the extension only ever runs
+   scripts you've installed, and it needs access to the page in step 3
+   to offer the install at all. (Minimum instead of All Websites:
+   **fantrax.com** AND **raw.githubusercontent.com** -- without the
+   second one, no install prompt ever appears on the script's page.)
 3. In Safari, open
    [prettier-fantrax.user.js](https://raw.githubusercontent.com/noahsemus/prettier-fantrax/main/prettier-fantrax.user.js),
    tap the **puzzle-piece button** in the address bar (older iOS: the
    **aA** menu), tap **Userscripts**, then **install**.
 4. Open (or refresh) fantrax.com.
+
+No install option in step 3? That's almost always step 2's permission
+missing for `raw.githubusercontent.com`. Failing that, the manual
+route always works: use Safari's **Share → Save to Files** on the
+script and put it in the **Userscripts** folder -- it's picked up
+immediately.
 
 The same file works in Safari on a Mac and in any userscript manager
 (Tampermonkey, Violentmonkey). One difference from the extension: the
