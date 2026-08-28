@@ -1130,14 +1130,30 @@
      preferred content width, which .fxm-matchup's `overflow: hidden`
      then silently clips on the right instead of visibly scrolling --
      either way, real cards end up cut off-screen on a ~380-400px-wide
-     phone viewport. Fix at the source: shrink just the un-modified
-     (non-bench -- that's already its own compact 52px size at every
-     width) pitch card, and tighten the line's gap, so a 5-across line
-     comfortably fits. 5 * 58px + 4 * 6px gap = 314px, well inside a real
-     phone's available width even after Fantrax's own page chrome margins
-     (measured ~380-390px on a 414px-wide viewport). */
-  .fxm-line {
+     phone viewport. Fix at the source: shrink the un-modified (non-bench
+     -- that's already its own compact 52px size at every width) pitch
+     card so a 5-across line fits most phone viewports; where it still
+     can't (the line gap below is sized to match the roster pitch's
+     visible spacing), the line pans with edge arrows instead of
+     clipping. */
+  .fxm-half {
+    /* 4px base + the lines' own 4px vertical paddings puts cards ~12px
+       apart vertically; the roster pitch's rows sit 14px apart. 6px here
+       makes the two pitches' vertical rhythm match (user request:
+       matchup's mobile spacing should equal roster's). */
     gap: 6px;
+  }
+
+  .fxm-line {
+    /* 16px, not the 6px this used to be: the roster's cards carry 4px of
+       transparent padding + a 1px border around their info plate, so its
+       6px flex gap reads as ~16px of green between plates -- matchup
+       cards have no such padding, so matching the VISIBLE spacing means
+       matching that 16px here (user request: same spacing as roster).
+       A 5-wide line is now 5 * 58 + 4 * 16 = 354px and can overflow a
+       very narrow viewport -- which is fine and matches roster exactly:
+       that's what the horizontal panning + edge arrows are for. */
+    gap: 16px;
     /* If a shrunken 5-wide row STILL can't fit (very small widths), pan
        horizontally instead of clipping. `safe center` = centered while it
        fits, start-aligned once it overflows (plain centering + overflow
