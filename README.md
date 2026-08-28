@@ -34,156 +34,75 @@ section.)
 
 Works in Chrome and Chrome-based browsers (Edge, Brave, Arc, ...).
 
-1. Grab the extension ZIP from the [latest
+1. Download the extension ZIP from the [latest
    release](https://github.com/noahsemus/prettier-fantrax/releases/latest)
-   and unzip it somewhere permanent. (Chrome loads the extension
-   straight from this folder every time, so don't delete or move it
-   afterwards.)
-2. In Chrome, open a new tab and go to `chrome://extensions`.
-3. Turn on **Developer mode** (toggle in the top-right corner).
-4. Click **Load unpacked** (top-left) and select the unzipped folder --
-   the one that contains `manifest.json`. "Prettier Fantrax" appears in
-   your extensions list.
-5. Open (or refresh) fantrax.com. That's it -- the features apply
-   automatically on any `https://www.fantrax.com/*` page.
+   and unzip it somewhere permanent (Chrome loads it from this folder
+   from then on).
+2. Go to `chrome://extensions`, turn on **Developer mode** (top right),
+   click **Load unpacked**, and pick the unzipped folder.
+3. Open (or refresh) fantrax.com.
 
-No permissions beyond running on fantrax.com are requested, and nothing
-is sent to any third party (see the note above about the two features
-that read from Fantrax's own endpoint).
-
-To update later: download the new release ZIP, replace the folder's
-contents, and click the refresh icon on the extension's card in
-`chrome://extensions`.
+To update: replace the folder's contents with the new release's, then
+hit the refresh icon on the extension's card.
 
 ### On an iPhone (free -- no computer needed)
 
-Apple doesn't let Safari install browser extensions freely -- publishing
-one requires a $99/yr Apple Developer account. But iOS Safari *can* run
-this as a **userscript**, via the free, open-source
+iOS Safari runs this as a userscript via the free, open-source
 [Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887)
-app on the App Store. Same features, real Safari, your existing
-fantrax.com login, no expiry, and updates arrive on their own. This is
-the easiest phone install of any platform -- and it's the "here's a
-link" option for friends: they just follow these same steps.
+app -- real Safari, your existing fantrax.com login, no expiry,
+automatic updates. This is also the link to give friends.
 
-1. Install **Userscripts** from the App Store (free), and open it once
-   so it sets up its scripts folder (the default is fine).
-2. Turn the extension on: **Settings → Apps → Safari → Extensions →
-   Userscripts** (older iOS: **Settings → Safari → Extensions**).
-   While you're there, allow it for **fantrax.com**.
-3. In Safari, open the script:
-   [prettier-fantrax.user.js](https://raw.githubusercontent.com/noahsemus/prettier-fantrax/main/prettier-fantrax.user.js)
-4. Tap the **extensions (puzzle-piece) button** in the address bar (on
-   older iOS it's inside the **aA** menu), tap **Userscripts**, and tap
-   **install** on the prompt it shows.
-5. Open (or refresh) fantrax.com in Safari. That's it -- tap a player
-   for the stat tooltip, tap-and-hold then drag to swap.
+1. Install **Userscripts** from the App Store and open it once (the
+   default scripts folder is fine).
+2. Enable it under **Settings → Apps → Safari → Extensions →
+   Userscripts** (older iOS: **Settings → Safari → Extensions**), and
+   allow it for **fantrax.com**.
+3. In Safari, open
+   [prettier-fantrax.user.js](https://raw.githubusercontent.com/noahsemus/prettier-fantrax/main/prettier-fantrax.user.js),
+   tap the **puzzle-piece button** in the address bar (older iOS: the
+   **aA** menu), tap **Userscripts**, then **install**.
+4. Open (or refresh) fantrax.com.
 
-Updates are automatic: the script periodically checks its own source
-URL (that's the `@updateURL` in step 3's file), so a new release just
-shows up. The one difference from the Chrome extension: the
-starter-not-starting warning appears as the on-pitch banner only, with
-no system notification -- userscripts can't post those.
-
-The same userscript also works in **Safari on a Mac** (same app, same
-steps) and in any browser with a userscript manager (Tampermonkey,
-Violentmonkey), if you'd rather not load the unpacked extension.
-
-(Tinkerers: the [Orion browser](https://orionbrowser.com/) for iOS can
-install actual Chrome extensions, but its extension support is still
-beta -- the Userscripts route above is the dependable one.)
-
-### The iPhone companion app (needs a Mac; expires weekly)
-
-`mobile/` also wraps this into a real installable app -- worth it only
-if you want a dedicated icon on the home screen instead of using
-Safari. Apple doesn't let iPhones install apps from a link unless the
-developer pays for the $99/yr account, so without one the only way is
-to build the app yourself and "sideload" it with a cable. It's
-genuinely free, but two catches: **you need a Mac with Xcode**, and
-**the app expires after 7 days** -- plugging the phone back in and
-pressing Run again re-signs it for another 7 days.
-
-What you need: a Mac, a free Apple ID, your iPhone + a USB cable.
-
-1. On the Mac, install **Xcode** (free, Mac App Store -- it's big) and
-   **Node.js** (free, from [nodejs.org](https://nodejs.org)).
-2. Download this repo (green **Code** button → **Download ZIP** → unzip),
-   or `git clone` it.
-3. Open Terminal, `cd` into the repo's `mobile/` folder, and run:
-
-   ```
-   npm install
-   npm run build
-   npx cap open ios
-   ```
-
-   The last command opens the iOS project in Xcode.
-4. In Xcode, sign in with your Apple ID: **Xcode → Settings → Accounts
-   → "+" → Apple ID**.
-5. In the left sidebar click the blue **App** project, select the
-   **App** target, open the **Signing & Capabilities** tab, tick
-   **Automatically manage signing**, and pick your **Personal Team**
-   from the Team dropdown. (If Xcode complains the bundle identifier is
-   taken, change it to anything unique, e.g. add your name to it.)
-6. Plug in the iPhone, unlock it, and tap **Trust This Computer**. Then
-   pick your iPhone from the device dropdown at the top of the Xcode
-   window (where it says a simulator name by default).
-7. On the iPhone, turn on Developer Mode: **Settings → Privacy &
-   Security → Developer Mode → on** (the phone restarts). This option
-   only appears once Xcode has seen the phone at least once.
-8. Press the **▶ Run** button in Xcode. The first time, the iPhone will
-   block the app until you trust yourself as a developer: **Settings →
-   General → VPN & Device Management →** tap your Apple ID **→ Trust**.
-   Then run it again from Xcode.
-9. Open the **Prettier Fantrax** app on the phone and log in to Fantrax
-   once -- the session persists from then on.
-
-When it expires (7 days): plug the phone back into the Mac and press
-**▶ Run** in Xcode again. Your login inside the app survives. (Free
-Apple IDs are also limited to 3 sideloaded apps on a phone at a time.)
-
-**Giving the app to iPhone-owning friends:** there is unfortunately no
-"here's a link" option for the *app* without the paid account -- every
-tap-a-link route (TestFlight, Ad Hoc, the App Store itself) requires
-the $99/yr membership, and the free sideloading tools (AltStore,
-SideStore) still mean per-phone setup and the same 7-day expiry. So
-point friends at the [userscript
-install](#on-an-iphone-free----no-computer-needed) above instead --
-that one really is just a link.
+The same file works in Safari on a Mac and in any userscript manager
+(Tampermonkey, Violentmonkey). One difference from the extension: the
+starter-not-starting warning is the on-pitch banner only -- userscripts
+can't post system notifications.
 
 ### On an Android phone
 
-Android allows installing apps from a plain file, so you build the APK
-once and can then share it with anyone.
+1. On the phone, download **prettier-fantrax-vX.X.X.apk** from the
+   [latest
+   release](https://github.com/noahsemus/prettier-fantrax/releases/latest).
+2. Tap the downloaded file and allow **Install unknown apps**. (Play
+   Protect warns about apps from outside the Play Store; that's
+   expected.)
+3. Open the app and log in to Fantrax once -- the session persists.
 
-1. Install **Node.js** ([nodejs.org](https://nodejs.org)) and **Android
-   Studio** ([developer.android.com/studio](https://developer.android.com/studio))
-   on any computer.
-2. Download this repo (green **Code** button → **Download ZIP** → unzip),
-   or `git clone` it.
-3. In a terminal, `cd` into the repo's `mobile/` folder and run:
+### The iPhone companion app (needs a Mac; expires weekly)
 
-   ```
-   npm install
-   npm run build
-   npx cap open android
-   ```
+Only worth it if you want a home-screen icon instead of Safari. Apple
+doesn't allow installing apps from a link without a $99/yr developer
+account, so this has to be built and sideloaded with Xcode, the install
+expires after 7 days (plug back in and Run again to renew; your login
+survives), and there's no free way to hand the app itself to friends --
+point them at the [userscript
+install](#on-an-iphone-free----no-computer-needed) above.
 
-   The last command opens the project in Android Studio (first launch
-   downloads the Android SDK -- let it finish).
-4. In Android Studio: **Build → Build App Bundle(s) / APK(s) → Build
-   APK(s)**. When it finishes, the APK is at
-   `mobile/android/app/build/outputs/apk/debug/app-debug.apk`.
-5. Get that file onto the phone any way you like -- message it, email
-   it, or upload it somewhere and send the link (a GitHub release works
-   well). On the phone, tap the file and allow **Install unknown apps**
-   when prompted -- "Prettier Fantrax" lands on their home screen. Done.
+1. On a Mac: install **Xcode** and [Node.js](https://nodejs.org), clone
+   or download this repo, then
+   `cd mobile && npm install && npm run build && npx cap open ios`.
+2. In Xcode: add your Apple ID under **Settings → Accounts**, then in
+   the **App** target's **Signing & Capabilities** tab tick
+   **Automatically manage signing** and pick your **Personal Team**
+   (rename the bundle id if it's taken).
+3. Plug in the iPhone, trust the computer, pick the phone as the run
+   target, and enable **Settings → Privacy & Security → Developer
+   Mode** on it.
+4. Press **▶ Run**. On first run, trust yourself under **Settings →
+   General → VPN & Device Management**, run again, and log in to
+   Fantrax once in the app.
 
-(Alternatively, plug your own phone in with USB debugging enabled and
-press **▶ Run** in Android Studio to install it directly.)
-
-**Heads-up on both phone versions:** the app wraps the fantrax.com
+**Heads-up on both apps (Android and iOS):** the app wraps the fantrax.com
 website (not the official Fantrax app) and injects the same features
 into it, with touch equivalents where hover/drag don't exist -- tap a
 player for the stat tooltip, tap-and-hold then drag to swap. See
