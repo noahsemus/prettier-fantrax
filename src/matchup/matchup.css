@@ -1138,10 +1138,27 @@
      (measured ~380-390px on a 414px-wide viewport). */
   .fxm-line {
     gap: 6px;
+    /* If a shrunken 5-wide row STILL can't fit (very small widths), pan
+       horizontally instead of clipping. `safe center` = centered while it
+       fits, start-aligned once it overflows (plain centering + overflow
+       makes the left half unreachable). Scrollbar hidden; touch swipe /
+       trackpad panning still scroll. Identical treatment to the roster
+       pitch's .fx-pitch__row -- see pitch.css. */
+    overflow-x: auto;
+    justify-content: safe center;
+    scrollbar-width: none;
+  }
+
+  .fxm-line::-webkit-scrollbar {
+    display: none;
   }
 
   .fxm-card:not(.fxm-card--bench) {
     width: 58px;
+    /* Don't shrink below the fixed width -- flex items compress before a
+       container overflows, which would squash the cards instead of letting
+       the line pan (the overflow-x: auto above). */
+    flex-shrink: 0;
   }
 
   .fxm-card:not(.fxm-card--bench) .fxm-card__crest {

@@ -356,6 +356,10 @@ body:not(.theme--dark) .fx-bench .fx-card__fpts--zero {
 @media (max-width: 760px) {
   .fx-pitch__row .fx-card {
     width: 58px;
+    /* Don't shrink below the fixed width -- flex items compress before a
+       container overflows, which would squash the cards instead of letting
+       the row pan (pitch.css's overflow-x: auto). */
+    flex-shrink: 0;
   }
 
   .fx-pitch__row .fx-card__crest {
