@@ -227,6 +227,13 @@
       calc((100% - (var(--fx-cards, 5) * 68px)) / max(1, var(--fx-cards, 5) - 1)),
       6px
     );
+    /* Same value again, published for scroll-affordance.css's arrow-chip
+       margins (they must cancel exactly one gap slot -- see its comment). */
+    --fxs-row-gap: clamp(
+      2px,
+      calc((100% - (var(--fx-cards, 5) * 68px)) / max(1, var(--fx-cards, 5) - 1)),
+      6px
+    );
     overflow-x: auto;
     justify-content: safe center;
     scrollbar-width: none;

@@ -1163,6 +1163,13 @@
       calc((100% - (var(--fxm-cards, 5) * 58px)) / max(1, var(--fxm-cards, 5) - 1)),
       16px
     );
+    /* Same value again, published for scroll-affordance.css's arrow-chip
+       margins (they must cancel exactly one gap slot -- see its comment). */
+    --fxs-row-gap: clamp(
+      6px,
+      calc((100% - (var(--fxm-cards, 5) * 58px)) / max(1, var(--fxm-cards, 5) - 1)),
+      16px
+    );
     /* If a shrunken 5-wide row STILL can't fit (very small widths), pan
        horizontally instead of clipping. `safe center` = centered while it
        fits, start-aligned once it overflows (plain centering + overflow

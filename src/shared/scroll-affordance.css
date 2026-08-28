@@ -9,6 +9,7 @@
    scrolling). Sized/colored for the green pitch both pitches share, so
    one look works in light and dark themes alike. */
 
+@media (max-width: 760px) {
 .fxs-hscroll::before,
 .fxs-hscroll::after {
   position: sticky;
@@ -34,16 +35,28 @@
   transition: opacity 0.18s ease;
 }
 
+/* The negative margin must cancel the chip's own width PLUS exactly one
+   flex gap slot (the chip is a flex item, so it introduces one) -- and
+   the gap is ELASTIC now (each feature's narrow block computes it and
+   publishes it as --fxs-row-gap alongside setting gap itself), so the
+   margin derives from that same var rather than hardcoding a gap. A
+   hardcoded -22px (16px chip + the old fixed 6px gap) left +10px of
+   phantom row width per chip once gaps could grow to 16px -- enough to
+   push a row that actually fit into overflow, showing wide gaps AND a
+   scroll arrow at once (reported on-device). The whole block is scoped
+   to the same 760px breakpoint the rows' scrolling is: wider viewports
+   never scroll these rows, so the chips shouldn't exist in their layout
+   at all there. */
 .fxs-hscroll::before {
   content: "\2039"; /* single left angle quote, reads as a left arrow */
   left: 2px;
-  margin-right: -22px; /* 16px own width + 6px narrow-breakpoint gap */
+  margin-right: calc(-16px - var(--fxs-row-gap, 6px));
 }
 
 .fxs-hscroll::after {
   content: "\203A";
   right: 2px;
-  margin-left: -22px;
+  margin-left: calc(-16px - var(--fxs-row-gap, 6px));
 }
 
 .fxs-hscroll--left::before {
@@ -52,4 +65,5 @@
 
 .fxs-hscroll--right::after {
   opacity: 1;
+}
 }
