@@ -107,10 +107,6 @@ window.FXM = window.FXM || {};
     // src/shared/gameweek.js) -- refreshed every render(); gates
     // renderCard's season-average preview number.
     isFutureGameweek: false,
-    // 'stacked' (default) or 'combined' -- user preference for the mobile
-    // team-header layout, persisted to localStorage and set from there by
-    // render.js's ensureContainer the first time the container is built.
-    headerLayout: 'stacked',
     // Serialized snapshot of everything the last render painted from --
     // render() skips wholesale when it's unchanged (see its own comment
     // for the iOS tap-eating storm this prevents).
