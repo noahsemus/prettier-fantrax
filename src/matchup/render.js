@@ -56,6 +56,63 @@
   // image itself). Duplicated locally on purpose, not shared -- this
   // module must stand on its own regardless of script load order between
   // the pitch-editor and matchup features.
+  // ---------- mobile header-layout preference (persisted) ----------
+  // User setting: at narrow widths, whether the two team headers stack
+  // one above/below the pitch (the default, matching this feature's
+  // original layout) or sit side by side in one combined bar above the
+  // pitch instead. Lives entirely in OUR OWN container (ensureContainer
+  // below) -- unlike the roster pitch's injected "Pitch Editor" tab,
+  // which has to attach to one of Fantrax's own real (and, per user
+  // report, sometimes duplicated/hidden) nav elements, this toggle has
+  // no such fragile dependency: it's just a class on a div we created
+  // and fully own.
+  const HEADER_LAYOUT_KEY = 'fx-matchup-header-layout';
+
+  function getStoredHeaderLayout() {
+    try {
+      return localStorage.getItem(HEADER_LAYOUT_KEY) === 'combined' ? 'combined' : 'stacked';
+    } catch (err) {
+      return 'stacked'; // storage blocked (private mode, some WebViews) -- default, never throw
+    }
+  }
+
+  function setStoredHeaderLayout(value) {
+    try {
+      localStorage.setItem(HEADER_LAYOUT_KEY, value);
+    } catch (err) {
+      // best-effort persistence -- a session where storage is blocked just
+      // reverts to the default next load, which is a fine degradation
+    }
+  }
+
+  // Small pictograph (not text) so the button reads at a glance and never
+  // depends on Fantrax's own icon font (whose class names/ligatures aren't
+  // something this extension has ever relied on -- see e.g. the "swap
+  // horiz" ligature note elsewhere in this codebase's recon comments).
+  // Two rows -> stacked; two side-by-side columns -> combined. currentColor
+  // so it follows the button's own text color (and therefore the theme).
+  const HEADER_LAYOUT_ICON = {
+    stacked:
+      '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1.5" width="12" height="4.5" rx="1.2" stroke="currentColor" stroke-width="1.4"/><rect x="1" y="8" width="12" height="4.5" rx="1.2" stroke="currentColor" stroke-width="1.4"/></svg>',
+    combined:
+      '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1.5" width="5.2" height="11" rx="1.2" stroke="currentColor" stroke-width="1.4"/><rect x="7.8" y="1.5" width="5.2" height="11" rx="1.2" stroke="currentColor" stroke-width="1.4"/></svg>',
+  };
+
+  function applyHeaderLayout(wrapper, layout) {
+    wrapper.classList.toggle('fxm-matchup--headers-combined', layout === 'combined');
+  }
+
+  function updateHeaderLayoutBtn(btn, layout) {
+    // Icon for the CURRENT state plus a label for what tapping it DOES
+    // (the upcoming state) -- same convention as the pitch show/hide
+    // button just below, which already reads "Hide pitch" while shown.
+    const next = layout === 'combined' ? 'stacked' : 'combined';
+    btn.innerHTML = HEADER_LAYOUT_ICON[layout];
+    const label = next === 'combined' ? 'Combine team headers' : 'Stack team headers';
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  }
+
   function jerseyFromCrest(crestUrl, pos) {
     if (!crestUrl) return null;
     const m = crestUrl.match(/^(.*)\/assets\/images\/logos\/sportsteam\/epl\/([^/]+)\.png$/);
@@ -1162,6 +1219,25 @@
 
     const topbar = el('div', 'fxm-topbar');
     topbar.appendChild(el('div', 'fxm-topbar__title', 'Matchup Pitch'));
+
+    const actions = el('div', 'fxm-topbar__actions');
+
+    // Mobile-only (hidden ≥761px via matchup.css) -- at wide widths the
+    // headers are ALREADY side by side, so the setting has nothing to do
+    // there. See the header-layout helpers above this function.
+    state.headerLayout = getStoredHeaderLayout();
+    applyHeaderLayout(wrapper, state.headerLayout);
+    const layoutBtn = el('button', 'fxm-icon-btn fxm-icon-btn--layout');
+    layoutBtn.type = 'button';
+    updateHeaderLayoutBtn(layoutBtn, state.headerLayout);
+    layoutBtn.addEventListener('click', () => {
+      state.headerLayout = state.headerLayout === 'combined' ? 'stacked' : 'combined';
+      setStoredHeaderLayout(state.headerLayout);
+      applyHeaderLayout(wrapper, state.headerLayout);
+      updateHeaderLayoutBtn(layoutBtn, state.headerLayout);
+    });
+    actions.appendChild(layoutBtn);
+
     const toggleBtn = el('button', 'fxm-toggle-btn', state.hidden ? 'Show pitch' : 'Hide pitch');
     toggleBtn.type = 'button';
     toggleBtn.addEventListener('click', () => {
@@ -1169,7 +1245,9 @@
       toggleBtn.textContent = state.hidden ? 'Show pitch' : 'Hide pitch';
       if (state.bodyEl) state.bodyEl.style.display = state.hidden ? 'none' : '';
     });
-    topbar.appendChild(toggleBtn);
+    actions.appendChild(toggleBtn);
+
+    topbar.appendChild(actions);
     wrapper.appendChild(topbar);
     state.toggleBtn = toggleBtn;
 
