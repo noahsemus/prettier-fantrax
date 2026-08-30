@@ -255,18 +255,6 @@
    --fxm-marquee-dist, so nothing side-specific needs duplicating here). */
 .fxm-team-header__name--marquee {
   text-align: left;
-  /* Fades both edges of the box to transparent (not just the trailing one)
-     so the scrolling text reads as passing under a window rather than
-     hard-clipping at a rectangular edge -- applied ONLY while marqueeing
-     (user request: "if a team name is too long"), not to a short name
-     sitting still with nothing hidden past its own edges to fade toward.
-     Masks the box itself (this element, not the animating inner span), so
-     the fade zone stays fixed at the box's own left/right edges regardless
-     of how far the text has scrolled underneath it. -webkit- prefixed
-     copy required for WebKit/Safari (this runs inside the iOS app's
-     WebView, not just Chrome); both are needed, not either/or. */
-  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
 }
 
 .fxm-team-header__name--marquee .fxm-team-header__name-text {
@@ -308,11 +296,6 @@
    own comment above -- identical reasoning, just for this element. */
 .fxm-team-header__owner--marquee {
   text-align: left;
-  /* Same edge-fade mask as .fxm-team-header__name--marquee just above --
-     identical reasoning, just for this (smaller) element; a fade width
-     scaled down to match its smaller font/box. */
-  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
 }
 
 .fxm-team-header__owner--marquee .fxm-team-header__owner-text {
